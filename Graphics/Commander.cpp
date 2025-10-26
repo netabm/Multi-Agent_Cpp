@@ -64,26 +64,6 @@ void Commander::UpdateVisibility(const std::vector<Soldier*>& team_soldiers, int
 	}
 }
 
-//void Commander::CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
-//{
-//    if (!isAlive) return;
-//
-//    SupplySoldier* supply = nullptr;
-//    for (Soldier* s : team_soldiers) {
-//        supply = dynamic_cast<SupplySoldier*>(s);
-//        if (supply && supply->IsAlive()) {
-//            break; // Found an alive Supply Soldier
-//        }
-//    }
-//
-//    for (Soldier* s : team_soldiers) {
-//        Warrior* w = dynamic_cast<Warrior*>(s);
-//        if (w && w->IsAlive() && w->getAmmo() < 10) {
-//            supply->GiveAmmo(w, map, securityMap);
-//        }
-//    }
-//}
-
 void Commander::CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
     if (!isAlive) return;
@@ -111,6 +91,30 @@ void Commander::CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MS
     }
 }
 
+void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
+    int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
+{
+    if (!isAlive) return;
+
+    Medic* availableMedic = nullptr;
+    for (Soldier* s : team_soldiers) {
+        Medic* m = dynamic_cast<Medic*>(s);
+        if (m && m->IsAlive() && m->getSupportState() == SUPPORT_IDLE) {
+            availableMedic = m;
+            break;
+        }
+    }
+    if (!availableMedic) return;
+
+    for (Soldier* s : team_soldiers) {
+        Warrior* w = dynamic_cast<Warrior*>(s);
+        if (w && w->IsAlive() && w->getHealth() < 25) {
+            availableMedic->AssignSupportTask(w);
+            return;
+        }
+    }
+}
+
 
 
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
@@ -120,8 +124,8 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
     // Update the team's visibility map
     UpdateVisibility(team_soldiers, map);
 
-    // Check for ammo
     CheckAmmo(team_soldiers, map, securityMap);
+    CheckHealth(team_soldiers, map, securityMap);
 
     // Analyze team status
     int aliveCount = 0;

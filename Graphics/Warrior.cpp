@@ -45,19 +45,37 @@ void Warrior::Show()
 
 Bullet* Warrior::Shoot(Soldier* target)
 {
-	if (bullet_ammo <= 0)
+	// Check ammo and target validity
+	if (bullet_ammo <= 0 || target == nullptr || !target->IsAlive()) {
 		return nullptr;
-
-	Point2D target_pos = target->getPosition();
-
-	double distance = sqrt(pow(target_pos.x - x, 2) + pow(target_pos.y - y, 2));
-
-	if (distance <= WARRIOR_FIRING_RANGE) {
-		bullet_ammo--;
-		double angle = atan2(target_pos.y - y, target_pos.x - x);
-		return new Bullet(x + 0.5, y + 0.5, angle, this);
 	}
-	return nullptr;
+
+	// Use precise coordinates for calculations
+	double target_x_precise = target->getX();
+	double target_y_precise = target->getY();
+
+	// Calculate squared distance for efficiency (precise shooter to precise target)
+	double dx_dist = target_x_precise - x;
+	double dy_dist = target_y_precise - y;
+	double dist_sq = dx_dist * dx_dist + dy_dist * dy_dist; // Use squared distance
+
+	// Check range using squared distance
+	// Add a small tolerance (e.g., half a unit squared) to prevent range issues at edge cases
+	double range_sq_with_tolerance = (WARRIOR_FIRING_RANGE + 0.5) * (WARRIOR_FIRING_RANGE + 0.5);
+
+	if (dist_sq <= range_sq_with_tolerance) {
+		bullet_ammo--;
+
+		double angle = atan2((target_y_precise + 0.5) - (y + 0.5),
+			(target_x_precise + 0.5) - (x + 0.5));
+
+		// Create bullet, passing 'this' as the shooter
+		Bullet* new_bullet = new Bullet(x + 0.5, y + 0.5, angle, this); // Pass 'this'
+		new_bullet->setIsMoving(true); // Activate the bullet
+
+		return new_bullet;
+	}
+	return nullptr; // Target out of range
 }
 
 Grenade* Warrior::ThrowGrenade(Soldier* target)
@@ -119,6 +137,8 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		shoot_cooldown_timer--;
 	}
 
+	CalculateVisibility(this, map, visibility);
+
 	// if commander is dead
 	if (!is_commander_alive && currentInternalState == STATE_IDLE) {
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
@@ -130,6 +150,7 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 
 	switch (currentInternalState) {
 	case STATE_IDLE:
+		//printf("idle\n");
 		// Scan for enemies if commander is dead
 		if (!is_commander_alive) {
 			Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
@@ -141,11 +162,11 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		break;
 
 	case STATE_MOVING:
+		printf("moving\n");
 		// Move toward target location
 		if (!isMoving && path.empty()) {
 			SetTarget(targetLocation.x, targetLocation.y, map, securityMap);
 		}
-		//Move(map);
 
 		// If reached destination, switch state
 		if (!isMoving && path.empty()) {
@@ -154,6 +175,7 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 
 		// While moving to ATTACK area, check for enemies
 		if (currentCommand == ATTACK) {
+			//printf("attack in move\n");
 			Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
 			if (enemy) {
 				currentTargetEnemy = enemy;
@@ -165,25 +187,47 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		break;
 
 	case STATE_SCANNING_AREA:
-		// Look for visible enemies
 	{
+		printf("scanning\n");
+		// Keep scanning for enemies over time
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
 		if (enemy) {
 			currentTargetEnemy = enemy;
 			currentInternalState = STATE_ENGAGING;
 		}
 		else {
-			// No enemies found, stay idle
-			currentInternalState = STATE_IDLE;
-			currentCommand = IDLE;
+			// No enemies currently visible — optionally wander or look around
+			scan_timer++;
+			if (scan_timer > SCAN_TIMEOUT_FRAMES) {
+				// After some time, move slightly to a new random nearby position
+				Point2D pos = getPosition();
+				int dx = (rand() % 7) - 3; // -3..3
+				int dy = (rand() % 7) - 3;
+				Point2D new_target = { pos.x + dx, pos.y + dy };
+
+				// Clamp to map bounds manually
+				if (new_target.x < 0) new_target.x = 0;
+				else if (new_target.x >= MSZ) new_target.x = MSZ - 1;
+
+				if (new_target.y < 0) new_target.y = 0;
+				else if (new_target.y >= MSZ) new_target.y = MSZ - 1;
+
+				SetTarget(new_target.x, new_target.y, map, securityMap);
+				scan_timer = 0; // Reset timer
+			}
+
+			// Stay in scanning state — don’t go idle
+			currentInternalState = STATE_SCANNING_AREA;
 		}
 	}
 	break;
 
 	case STATE_ENGAGING:
 	{
+		printf("engaging\n");
 		if (!currentTargetEnemy || !currentTargetEnemy->IsAlive()) {
 			// Target lost or dead
+			//printf("target lost or dead\n");
 			currentTargetEnemy = nullptr;
 			currentInternalState = STATE_IDLE;
 			break;
@@ -191,7 +235,9 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 
 		// Check if target is visible
 		Point2D tgtPos = currentTargetEnemy->getPosition();
+
 		if (!visibility[tgtPos.y][tgtPos.x]) {
+			//printf("lost sight of target\n");
 			// Lost sight
 			currentTargetEnemy = nullptr;
 			currentInternalState = (currentCommand == ATTACK) ? STATE_SCANNING_AREA : STATE_IDLE;

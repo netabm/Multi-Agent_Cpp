@@ -10,7 +10,7 @@ protected:
 	void Show();
 
     Point2D GetWarehousePosition() const override {
-        return (team == 0) ? Point2D{ 1,1 } : Point2D{ MSZ - 8, MSZ - 4 }; // Example medical warehouse
+        return (team == 0) ? Point2D{ 2,8 } : Point2D{ MSZ - 3, MSZ - 3 };
     }
 
     void ApplyEffect(Warrior* warrior) override {

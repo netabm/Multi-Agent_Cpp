@@ -41,53 +41,160 @@ void InitMap()
 		for (int j = 0; j < MSZ; j++)
 			map[i][j] = 0;
 
-	// Warehouses
-	//team 0
+	// ========== WAREHOUSES ==========
+	// Team 0 (Purple/Magenta)
 	map[2][2] = AMMO_WAREHOUSE;
 	map[8][2] = MEDICAL_WAREHOUSE;
-
-	//team 1
+	// Team 1 (Orange)
 	map[MSZ - 9][MSZ - 3] = AMMO_WAREHOUSE;
 	map[MSZ - 3][MSZ - 3] = MEDICAL_WAREHOUSE;
 
-	// bottom-left cluster
-	//map[6][6] = STONE; map[7][6] = STONE; map[6][7] = STONE;
-	// bottom-center cluster
-	map[18][6] = STONE; map[19][6] = STONE; map[18][7] = STONE; map[20][7] = STONE;
-	// bottom-right cluster
-	map[42][6] = STONE; map[43][6] = STONE; map[42][7] = STONE;
-	// mid-left cluster
-	map[6][22] = STONE; map[7][22] = STONE; map[6][23] = STONE;
-	// mid-right cluster
-	map[42][24] = STONE; map[43][24] = STONE; map[44][24] = STONE;
-	// top-left cluster
-	map[6][42] = STONE; map[7][42] = STONE; map[6][43] = STONE;
-	// top-center cluster
-	map[24][42] = STONE; map[25][42] = STONE; map[24][43] = STONE;
-	// top-right cluster
-	//map[42][42] = STONE; map[43][42] = STONE; map[42][43] = STONE;
+	// ========== STONE FORMATIONS (Impassable, blocks LOS) ==========
 
-	// Tree patches (passable but block LOS)
-	// cluster A
-	map[14][10] = TREE; map[16][11] = TREE; map[15][12] = TREE;
-	// cluster B
-	map[10][28] = TREE; map[12][26] = TREE; map[11][27] = TREE;
-	// cluster C
-	map[30][14] = TREE; map[32][15] = TREE; map[31][16] = TREE;
-	// cluster D
-	map[36][34] = TREE; map[35][36] = TREE; map[34][35] = TREE;
-	// small scatter
-	map[22][8] = TREE; map[23][9] = TREE; map[21][9] = TREE;
+	// Bottom-left fortress
+	//for (int i = 5; i <= 8; i++) map[i][5] = STONE;
+	//for (int i = 5; i <= 8; i++) map[i][9] = STONE;
+	//map[5][6] = STONE; map[5][7] = STONE; map[5][8] = STONE;
 
-	// Water ponds (impassable for movement, vision passes)
-	// central pond
-	for (int i = 23; i <= 26; ++i) for (int j = 20; j <= 29; ++j) map[i][j] = WATER;
-	// small top pond
-	map[12][18] = WATER; map[12][19] = WATER; map[13][19] = WATER;
-	// small bottom pond
-	map[37][30] = WATER; map[36][31] = WATER; map[37][32] = WATER;
+	// Bottom-center scattered rocks
+	map[18][6] = STONE; map[19][6] = STONE; map[20][7] = STONE;
+	map[22][9] = STONE; map[23][10] = STONE;
 
-	// Leave some open corridors so A* produces different routes
+	// Bottom-right rock cluster
+	map[40][8] = STONE; map[41][8] = STONE; map[42][8] = STONE;
+	map[40][9] = STONE; map[42][9] = STONE;
+	map[41][10] = STONE;
+
+	// Mid-left mountain range
+	for (int j = 18; j <= 22; j++) map[7][j] = STONE;
+	map[8][20] = STONE; map[9][20] = STONE;
+	map[8][19] = STONE; map[9][21] = STONE;
+
+	// Mid-center obstacle
+	for (int i = 23; i <= 27; i++) {
+		for (int j = 23; j <= 26; j++) {
+			if (i == 25 && j == 24) continue; // Leave a gap
+			map[i][j] = STONE;
+		}
+	}
+
+	// Mid-right defensive wall
+	for (int j = 22; j <= 28; j++) map[42][j] = STONE;
+	map[41][24] = STONE; map[41][26] = STONE;
+	map[43][23] = STONE; map[43][27] = STONE;
+
+	// Top-left rock pile
+	map[6][38] = STONE; map[7][38] = STONE; map[8][38] = STONE;
+	map[6][39] = STONE; map[8][39] = STONE;
+	map[7][40] = STONE;
+
+	// Top-center scattered formation
+	map[20][40] = STONE; map[21][41] = STONE; map[22][40] = STONE;
+	map[24][42] = STONE; map[25][43] = STONE;
+
+	// Top-right corner rocks
+	map[40][41] = STONE; map[41][41] = STONE;
+	//map[40][42] = STONE; map[41][43] = STONE;
+	//map[42][42] = STONE;
+
+	// ========== TREE PATCHES (Passable, blocks LOS) ==========
+
+	// Bottom-left forest
+	map[12][8] = TREE; map[13][8] = TREE; map[14][8] = TREE;
+	map[11][9] = TREE; map[12][9] = TREE; map[13][9] = TREE; map[14][9] = TREE;
+	map[12][10] = TREE; map[13][10] = TREE; map[15][10] = TREE;
+	map[14][11] = TREE; map[16][11] = TREE;
+	map[15][12] = TREE;
+
+	// Bottom-center tree line
+	map[27][8] = TREE; map[28][8] = TREE; map[29][9] = TREE;
+	map[30][10] = TREE; map[31][11] = TREE;
+
+	// Bottom-right sparse trees
+	map[35][7] = TREE; map[36][9] = TREE; map[37][8] = TREE;
+	map[38][10] = TREE;
+
+	// Mid-left dense forest
+	map[10][26] = TREE; map[11][26] = TREE; map[12][26] = TREE;
+	map[9][27] = TREE; map[10][27] = TREE; map[11][27] = TREE; map[12][27] = TREE;
+	map[10][28] = TREE; map[11][28] = TREE; map[13][28] = TREE;
+	map[11][29] = TREE; map[12][29] = TREE;
+
+	// Mid-center jungle patch
+	map[18][18] = TREE; map[19][18] = TREE; map[20][18] = TREE;
+	map[17][19] = TREE; map[18][19] = TREE; map[19][19] = TREE;
+	map[18][20] = TREE; map[20][20] = TREE;
+
+	// Mid-right scattered trees
+	map[35][20] = TREE; map[36][21] = TREE; map[37][19] = TREE;
+	map[38][22] = TREE; map[39][20] = TREE;
+
+	// Top-left tree cluster
+	map[10][35] = TREE; map[11][35] = TREE; map[12][36] = TREE;
+	map[13][37] = TREE; map[14][36] = TREE;
+
+	// Top-center forest
+	map[26][36] = TREE; map[27][36] = TREE; map[28][36] = TREE;
+	map[26][37] = TREE; map[27][37] = TREE; map[28][37] = TREE; map[29][37] = TREE;
+	map[27][38] = TREE; map[28][38] = TREE;
+
+	// Top-right woodland
+	map[33][40] = TREE; map[34][40] = TREE; map[35][40] = TREE;
+	map[33][41] = TREE; map[34][41] = TREE; map[36][41] = TREE;
+	map[34][42] = TREE; map[35][42] = TREE;
+
+	// Scattered individual trees for ambush points
+	map[16][15] = TREE; map[32][14] = TREE;
+	map[15][30] = TREE; map[30][32] = TREE;
+	map[20][35] = TREE; map[35][25] = TREE;
+
+	// ========== WATER BODIES (Impassable, vision passes) ==========
+
+	// Central lake (large)
+	for (int i = 22; i <= 28; i++) {
+		for (int j = 28; j <= 34; j++) {
+			map[i][j] = WATER;
+		}
+	}
+	// Add some irregular edges to the lake
+	map[21][30] = WATER; map[21][31] = WATER; map[21][32] = WATER;
+	map[29][29] = WATER; map[29][30] = WATER; map[29][33] = WATER;
+
+	// Bottom-left pond
+	map[12][14] = WATER; map[13][14] = WATER; map[14][14] = WATER;
+	map[12][15] = WATER; map[13][15] = WATER; map[14][15] = WATER;
+	map[13][16] = WATER;
+
+	// Bottom-right stream
+	map[36][12] = WATER; map[37][12] = WATER;
+	map[37][13] = WATER; map[38][13] = WATER;
+	map[38][14] = WATER; map[39][14] = WATER;
+	map[39][15] = WATER;
+
+	// Top-left pool
+	map[9][42] = WATER; map[10][42] = WATER; map[11][42] = WATER;
+	map[9][43] = WATER; map[10][43] = WATER; map[11][43] = WATER;
+	map[10][44] = WATER;
+
+	// Top-right river
+	map[43][36] = WATER; map[44][36] = WATER;
+	map[43][37] = WATER; map[44][37] = WATER; map[45][37] = WATER;
+	map[44][38] = WATER; map[45][38] = WATER;
+	map[45][39] = WATER;
+
+	// Mid-left creek
+	map[15][22] = WATER; map[16][22] = WATER;
+	map[16][23] = WATER; map[17][23] = WATER;
+	map[17][24] = WATER;
+
+	// Small scattered puddles
+	map[33][10] = WATER; map[34][10] = WATER;
+	map[18][33] = WATER; map[19][33] = WATER;
+	map[31][39] = WATER; map[32][39] = WATER;
+
+	// Additional tactical water features
+	map[5][16] = WATER; map[6][16] = WATER; map[5][17] = WATER;
+	map[40][33] = WATER; map[41][33] = WATER; map[41][34] = WATER;
 }
 
 void init()
@@ -109,6 +216,7 @@ void init()
 	soldiers.push_back(new Warrior(4, 8, 0));
 	soldiers.push_back(new Warrior(8, 4, 0));
 	soldiers.push_back(new SupplySoldier(12, 6, 0));
+	soldiers.push_back(new Medic(6, 12, 0));
 
 	// Team 1 (top-right region) - spread out
 	soldiers.push_back(new Commander(43, 43, 1));
@@ -384,20 +492,6 @@ void idle()
 			}
 			return false;
 		}), soldiers.end());
-
-	// 8. Throttled commander visibility update (optional - you already call Update above)
-	// (kept if you want separate visibility-only frequency, otherwise redundant)
-	/*static int frameCounter = 0;
-	if (++frameCounter >= 8) {
-		frameCounter = 0;
-		for (Soldier* s : soldiers) {
-			Commander* cmd = dynamic_cast<Commander*>(s);
-			if (cmd) {
-				auto team = GetTeamSoldiers(cmd->getTeam());
-				cmd->UpdateVisibility(team, map);
-			}
-		}
-	}*/
 
 	glutPostRedisplay();
 }

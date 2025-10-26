@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "SupplySoldier.h"
+#include "Medic.h"
 
 class Commander : public Soldier {
 private:
@@ -14,6 +15,7 @@ public:
 	void Show();
 
 	void CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+	void CheckHealth(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 	CommandType getCurrentCommand() const { return currentCommand; }
 	Point2D getTargetLocation() const { return targetLocation; }
 

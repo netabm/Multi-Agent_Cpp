@@ -20,6 +20,8 @@ public:
 
     void AssignSupportTask(Warrior* warrior_to_support);
 
+    //Point2D FindAdjacentFreeCell(const Point2D& center, double soldierX, double soldierY, int map[MSZ][MSZ]);
+
     virtual void Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 
     SupportState getSupportState() const { return current_support_state;}

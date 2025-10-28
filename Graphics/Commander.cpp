@@ -14,6 +14,8 @@ Commander::Commander(double start_x, double start_y, int team_id) : Soldier(star
 
 void Commander::Show()
 {
+    Soldier::Show();
+
 	if (!isAlive) return;
 
 	if (team == 0)
@@ -115,16 +117,11 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
     }
 }
 
-
-
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
     if (!isAlive) return;
 
-    // Update the team's visibility map
-    //UpdateVisibility(team_soldiers, map);
     CalculateTeamVisibility(team_soldiers, getTeam(), map, team_visibility);
-
     CheckAmmo(team_soldiers, map, securityMap);
     CheckHealth(team_soldiers, map, securityMap);
 
@@ -153,19 +150,14 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 
     // Decide command
     if (!enemyVisible) {
-        currentCommand = MOVE; // reposition / explore
+        currentCommand = IDLE;  // Just go IDLE when no enemies
     }
     else {
         if (avgHealth < 40) {
-            printf("team %d health under 40\n", team);
-            currentCommand = DEFEND; // hold position if team is weak
-        }
-        else if (aliveCount >= (int)visibleEnemies.size()) {
-            currentCommand = ATTACK; // favorable odds
+            currentCommand = DEFEND;
         }
         else {
-            currentCommand = ATTACK; // favorable odds
-            //currentCommand = DEFEND; // otherwise play safe
+            currentCommand = ATTACK;
         }
     }
 
@@ -194,7 +186,7 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
             targetLocation = { (int)avgX, (int)avgY };
         }
     }
-    // DEFEND: optionally keep last position
+    // DEFEND or IDLE: keep last position or do nothing
 
     // Give commands only to Warriors
     for (Soldier* s : team_soldiers) {

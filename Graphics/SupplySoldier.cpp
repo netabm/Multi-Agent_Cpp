@@ -6,6 +6,8 @@ Point2D AmmoWarehouse1 = { MSZ - 9, MSZ - 3 };
 
 void SupplySoldier::Show()
 {
+	Soldier::Show();
+
 	if (!isAlive) return;
 
 	if (team == 0)

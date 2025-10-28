@@ -1,4 +1,5 @@
 #include "Soldier.h"
+#include "glut.h"
 
 Soldier::Soldier(double start_x, double start_y, int team_id) {
 	x = start_x;
@@ -7,6 +8,38 @@ Soldier::Soldier(double start_x, double start_y, int team_id) {
 	health = 100;
 	isAlive = true;
 	isMoving = false;
+}
+
+void Soldier::Show() {
+	if (!isAlive) return;
+
+	// --- Draw Health Bar ---
+	double healthPercentage = (double)health / 100.0; // Assuming max health is 100
+	if (healthPercentage < 0) healthPercentage = 0;
+
+	// Bar position (slightly above the soldier's square)
+	double barY = y + 1.1; // Adjust Y offset as needed
+	double barHeight = 0.15; // Adjust height as needed
+	double barWidth = 1.0;   // Same width as the soldier square
+
+	// Draw background (e.g., dark red)
+	glColor3d(0.5, 0.1, 0.1);
+	glBegin(GL_POLYGON); // Use GL_RECTANGLE for simple filled rect
+	glVertex2d(x, barY);
+	glVertex2d(x + barWidth, barY);
+	glVertex2d(x + barWidth, barY + barHeight);
+	glVertex2d(x, barY + barHeight);
+	glEnd();
+
+	// Draw foreground (e.g., green) based on health percentage
+	glColor3d(0.1, 0.8, 0.1);
+	glBegin(GL_POLYGON);
+	glVertex2d(x, barY);
+	glVertex2d(x + (barWidth * healthPercentage), barY); // Width depends on health
+	glVertex2d(x + (barWidth * healthPercentage), barY + barHeight);
+	glVertex2d(x, barY + barHeight);
+	glEnd();
+	// ----------------------
 }
 
 void Soldier::SetTarget(int target_x, int target_y, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {

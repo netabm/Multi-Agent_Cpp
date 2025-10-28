@@ -22,7 +22,7 @@ public:
 	void SetTarget(int target_x, int target_y, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 	void TakeDamage();
 
-	virtual void Show() = 0;
+	virtual void Show();
 
 	int getHealth() { return health; }
 	bool IsAlive() const { return isAlive; }

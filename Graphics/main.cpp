@@ -95,9 +95,10 @@ void InitMap()
 	map[24][42] = STONE; map[25][43] = STONE;
 
 	// Top-right corner rocks
+	map[40][40] = STONE; map[43][42] = STONE;
 	map[40][41] = STONE; map[41][41] = STONE;
-	//map[40][42] = STONE; map[41][43] = STONE;
-	//map[42][42] = STONE;
+	map[40][42] = STONE; map[41][43] = STONE;
+	map[42][42] = STONE;
 
 	// ========== TREE PATCHES (Passable, blocks LOS) ==========
 

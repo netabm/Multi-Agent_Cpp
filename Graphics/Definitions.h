@@ -13,8 +13,8 @@ const int DAMAGE = 5;
 //const int ARMORY = 4;
 
 
-const double WARRIOR_FIRING_RANGE = 5.0;
-const double GRENADE_THROW_RANGE = 10.0;
+const double WARRIOR_FIRING_RANGE = 7.0;
+const double GRENADE_THROW_RANGE = 15.0;
 
 struct Point2D {
 	int x, y;

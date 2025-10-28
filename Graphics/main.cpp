@@ -25,6 +25,7 @@ Bullet* pb = nullptr;
 Grenade* pg = nullptr;
 Warrior* w01 = nullptr;
 Commander* c0 = nullptr;
+Commander* c1 = nullptr;
 
 std::vector<Soldier*> GetTeamSoldiers(int team_id)
 {
@@ -72,12 +73,12 @@ void InitMap()
 	map[8][19] = STONE; map[9][21] = STONE;
 
 	// Mid-center obstacle
-	for (int i = 23; i <= 27; i++) {
-		for (int j = 23; j <= 26; j++) {
-			if (i == 25 && j == 24) continue; // Leave a gap
-			map[i][j] = STONE;
-		}
-	}
+	//for (int i = 23; i <= 27; i++) {
+	//	for (int j = 23; j <= 26; j++) {
+	//		if (i == 25 && j == 24) continue; // Leave a gap
+	//		map[i][j] = STONE;
+	//	}
+	//}
 
 	// Mid-right defensive wall
 	for (int j = 22; j <= 28; j++) map[42][j] = STONE;
@@ -221,6 +222,7 @@ void init()
 
 	// Team 1 (top-right region) - spread out
 	soldiers.push_back(new Commander(43, 43, 1));
+	c1 = dynamic_cast<Commander*>(soldiers.back());
 	soldiers.push_back(new Warrior(41, 45, 1));
 	soldiers.push_back(new Warrior(45, 41, 1));
 }
@@ -389,39 +391,131 @@ void displaySecurityMap()
 	glutSwapBuffers(); // show all
 }
 
-void displayTeamVisibility()
+void DrawVisibilityMap()
 {
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	if (teamToShow < 0) return;
-
-	bool visible[MSZ][MSZ] = { false };
-
-	// Collect visibility from soldiers of that team
-	auto team = GetTeamSoldiers(teamToShow);
-	for (Soldier* s : team) {
-		bool(*s_vis)[MSZ] = s->getVisibility(); // assumes Soldier has getVisibility()
-		for (int i = 0; i < MSZ; i++)
-			for (int j = 0; j < MSZ; j++)
-				visible[i][j] = visible[i][j] || s_vis[i][j];
+	int i, j;
+	// Determine which team's map to show
+	bool(*visibility_map)[MSZ] = nullptr;
+	Commander* relevant_commander = nullptr;
+	if (teamToShow == 0 && c0 != nullptr && c0->IsAlive()) {
+		relevant_commander = c0;
+		visibility_map = c0->getTeamVisibility();
+	}
+	else if (teamToShow == 1 && c1 != nullptr && c1->IsAlive()) { // Need pointer c1
+		relevant_commander = c1;
+		visibility_map = c1->getTeamVisibility();
 	}
 
-	// Draw the visibility map
-	for (int i = 0; i < MSZ; i++) {
-		for (int j = 0; j < MSZ; j++) {
-			if (visible[i][j])
-				glColor3d(0, 0, 1); // blue for visible
-			else
-				glColor3d(0.1, 0.1, 0.1); // dark for invisible
+	// Get soldiers only for the relevant team to calculate distance
+	std::vector<Soldier*> relevant_team_soldiers = GetTeamSoldiers(teamToShow);
 
+
+	for (i = 0; i < MSZ; i++)
+	{
+		for (j = 0; j < MSZ; j++)
+		{
+			// If a cell is visible by the selected team...
+			if (visibility_map != nullptr && visibility_map[i][j])
+			{
+				// --- Calculate Gradient ---
+				double min_dist_sq = MSZ * MSZ * 2.0; // Start with a large squared distance
+				// Find squared distance to the closest *living* soldier *on the selected team*
+				for (Soldier* s : relevant_team_soldiers) { // Use the filtered list
+					if (s->IsAlive()) {
+						double dx = (s->getX() + 0.5) - (j + 0.5); // Distance between cell centers
+						double dy = (s->getY() + 0.5) - (i + 0.5);
+						double dist_sq = dx * dx + dy * dy;
+						if (dist_sq < min_dist_sq) {
+							min_dist_sq = dist_sq;
+						}
+					}
+				}
+				// Normalize distance (0 = very close, 1 = far)
+				// Use a reasonable max distance for normalization, e.g., half the map diagonal
+				double max_vis_dist = sqrt(2.0 * (MSZ / 2.0) * (MSZ / 2.0)); // Approx max distance
+				double normalized_dist = sqrt(min_dist_sq) / max_vis_dist;
+				normalized_dist = fmax(0.0, fmin(1.0, normalized_dist)); // Clamp between 0 and 1
+
+				// Interpolate color: Bright Yellowish-Green (close) to Dark Green (far)
+				// Green base: (0.1, 0.4, 0.1) -> Yellowish boost: (0.4, 0.4, 0.0)
+				double brightness = 1.0 - normalized_dist; // Invert: 1=close, 0=far
+				glColor3d(0.1 + 0.4 * brightness, 0.4 + 0.4 * brightness, 0.1);
+				// -------------------------
+			}
+			else {
+				// Dark Greenish-Grey for not visible (better than pure black)
+				glColor3d(0.15, 0.25, 0.15);
+			}
+
+			// Draw the square cell
 			glBegin(GL_POLYGON);
 			glVertex2d(j, i);
-			glVertex2d(j + 1, i);
-			glVertex2d(j + 1, i + 1);
 			glVertex2d(j, i + 1);
+			glVertex2d(j + 1, i + 1);
+			glVertex2d(j + 1, i);
 			glEnd();
 		}
 	}
+}
+
+void DrawSightLines()
+{
+	// Check which team we are showing visibility for
+	if (teamToShow < 0) return;
+
+	glColor3d(0, 0, 0); // Black lines
+	glLineWidth(0.5);   // Thin lines
+
+	// Get soldiers only for the selected team
+	std::vector<Soldier*> relevant_team_soldiers = GetTeamSoldiers(teamToShow);
+
+	// For every living soldier on that team
+	for (Soldier* s : relevant_team_soldiers)
+	{
+		if (s->IsAlive())
+		{
+			// Draw lines from center of soldier to map corners
+			// (Could also draw lines to edges of visible polygon for more accuracy, but corners are simpler)
+			double soldier_center_x = s->getX() + 0.5;
+			double soldier_center_y = s->getY() + 0.5;
+
+			glBegin(GL_LINES);
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(0, 0);       // To Bottom-left
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(MSZ, 0);    // To Bottom-right
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(0, MSZ);     // To Top-left
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(MSZ, MSZ);    // To Top-right
+			glEnd();
+
+			// Optional: Add more lines to midpoints of edges for denser look
+			glBegin(GL_LINES);
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(MSZ / 2.0, 0); // To Bottom-mid
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(MSZ / 2.0, MSZ); // To Top-mid
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(0, MSZ / 2.0); // To Left-mid
+			glVertex2d(soldier_center_x, soldier_center_y); glVertex2d(MSZ, MSZ / 2.0); // To Right-mid
+			glEnd();
+		}
+	}
+	glLineWidth(1.0); // Reset line width
+}
+
+void displayTeamVisibility() // Renamed from displayVisibilityMap for clarity
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Draw the gradient visibility map background
+	DrawVisibilityMap(); // Uses teamToShow global variable
+
+	// Draw Grenades / Bullets (Optional for this view)
+	// for (Grenade* g : active_grenades) g->Show();
+	// for (Bullet* b : active_bullets) b->Show();
+
+	// Draw Soldiers for ALL teams (so you see enemies in visible areas)
+	for (Soldier* s : soldiers) {
+		s->Show();
+	}
+
+	// Draw the sight lines for the selected team ON TOP
+	DrawSightLines(); // Uses teamToShow global variable
 
 	glutSwapBuffers();
 }

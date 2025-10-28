@@ -12,6 +12,7 @@
 const int W = 600;
 const int H = 600; // window sizes
 const double PI = 3.14;
+int teamToShow = -1; // -1 = no team, 0 = team 0, 1 = team 1
 
 int map[MSZ][MSZ] = { 0 };
 double securityMap[MSZ][MSZ] = { 0 };
@@ -388,6 +389,44 @@ void displaySecurityMap()
 	glutSwapBuffers(); // show all
 }
 
+void displayTeamVisibility()
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	if (teamToShow < 0) return;
+
+	bool visible[MSZ][MSZ] = { false };
+
+	// Collect visibility from soldiers of that team
+	auto team = GetTeamSoldiers(teamToShow);
+	for (Soldier* s : team) {
+		bool(*s_vis)[MSZ] = s->getVisibility(); // assumes Soldier has getVisibility()
+		for (int i = 0; i < MSZ; i++)
+			for (int j = 0; j < MSZ; j++)
+				visible[i][j] = visible[i][j] || s_vis[i][j];
+	}
+
+	// Draw the visibility map
+	for (int i = 0; i < MSZ; i++) {
+		for (int j = 0; j < MSZ; j++) {
+			if (visible[i][j])
+				glColor3d(0, 0, 1); // blue for visible
+			else
+				glColor3d(0.1, 0.1, 0.1); // dark for invisible
+
+			glBegin(GL_POLYGON);
+			glVertex2d(j, i);
+			glVertex2d(j + 1, i);
+			glVertex2d(j + 1, i + 1);
+			glVertex2d(j, i + 1);
+			glEnd();
+		}
+	}
+
+	glutSwapBuffers();
+}
+
+
 void idle()
 {
 	// 1. Let commanders make decisions (so they can assign orders)
@@ -529,6 +568,15 @@ void menu(int choice)
 	case 3:
 		glutDisplayFunc(display);
 		break;
+	case 4: // Show Team 1 visibility map
+		teamToShow = 0;
+		glutDisplayFunc(displayTeamVisibility);
+		break;
+
+	case 5: // Show Team 2 visibility map
+		teamToShow = 1;
+		glutDisplayFunc(displayTeamVisibility);
+		break;
 	}
 }
 
@@ -550,6 +598,8 @@ int main(int argc, char* argv[])
 	glutAddMenuEntry("Create Security Map", 1);
 	glutAddMenuEntry("Show Security Map", 2);
 	glutAddMenuEntry("Show Regular Map", 3);
+	glutAddMenuEntry("Show Team 1 Visibility", 4);
+	glutAddMenuEntry("Show Team 2 Visibility", 5);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 
 	init();

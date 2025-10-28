@@ -40,6 +40,31 @@ void CalculateVisibility(Soldier* soldier, int map[MSZ][MSZ], bool visible[MSZ][
     }
 }
 
+void CalculateTeamVisibility(const std::vector<Soldier*>& soldiers, int team_id, int map[MSZ][MSZ], bool teamVisible[MSZ][MSZ])
+{
+    // Initialize all cells as not visible
+    for (int i = 0; i < MSZ; i++)
+        for (int j = 0; j < MSZ; j++)
+            teamVisible[i][j] = false;
+
+    bool soldierVisible[MSZ][MSZ];
+
+    for (Soldier* s : soldiers) {
+        if (!s || !s->IsAlive() || s->getTeam() != team_id)
+            continue;
+
+        // Compute individual visibility
+        CalculateVisibility(s, map, soldierVisible);
+
+        // Merge into team visibility
+        for (int i = 0; i < MSZ; i++)
+            for (int j = 0; j < MSZ; j++)
+                if (soldierVisible[i][j])
+                    teamVisible[i][j] = true;
+    }
+}
+
+
 // Checks if there's a clear line of sight between two points
 bool HasLineOfSight(int x1, int y1, int x2, int y2, int map[MSZ][MSZ])
 {

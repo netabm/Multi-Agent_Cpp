@@ -28,6 +28,7 @@ public:
 	bool IsAlive() const { return isAlive; }
 	bool getIsMoving() { return isMoving; }
 	int getTeam() { return team; }
+	bool(&getVisibility())[MSZ][MSZ]{ return visibility; }
 
 	Point2D getPosition() { return { (int)x, (int)y }; }
 	double getX() const { return x; }

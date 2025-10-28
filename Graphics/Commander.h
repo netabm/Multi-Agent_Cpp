@@ -19,6 +19,6 @@ public:
 	CommandType getCurrentCommand() const { return currentCommand; }
 	Point2D getTargetLocation() const { return targetLocation; }
 
-	void UpdateVisibility(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ]);
+	//void UpdateVisibility(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ]);
 	bool (*getTeamVisibility())[MSZ] { return team_visibility; }
 };

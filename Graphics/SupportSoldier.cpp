@@ -25,11 +25,12 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
         return;
     }
 
+    // FIX 1: If target died, completely stop movement
     if (target_warrior && !target_warrior->IsAlive()) {
         current_support_state = SUPPORT_IDLE;
         target_warrior = nullptr;
-        isMoving = false;
-        path.clear();
+        isMoving = false;  // Stop moving
+        path.clear();      // Clear path
         return;
     }
 
@@ -41,39 +42,62 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
 
     switch (current_support_state) {
     case SUPPORT_MOVING_TO_WAREHOUSE:
-        if (!isMoving) {
+        // FIX 2: Check if already at warehouse FIRST
+        if (isNear(warehouse)) {
+            // Already at warehouse, proceed to next state
+            current_support_state = SUPPORT_MOVING_TO_WARRIOR;
+            path.clear();
+            isMoving = false;
+        }
+        else if (!isMoving && path.empty()) {
+            // Not at warehouse and not moving, start moving
             SetTarget(warehouse.x, warehouse.y, map, securityMap);
+
+            // If still not moving after SetTarget, pathfinding failed
             if (!isMoving) {
+                // Can't reach warehouse, abort mission
                 current_support_state = SUPPORT_IDLE;
                 target_warrior = nullptr;
             }
         }
-        else if (isNear(warehouse)) {
-            current_support_state = SUPPORT_MOVING_TO_WARRIOR;
-        }
+        // else: currently moving toward warehouse, let Move() handle it
         break;
 
     case SUPPORT_MOVING_TO_WARRIOR:
+        // Validate target still exists
         if (!target_warrior || warriorPos.x == -1) {
             current_support_state = SUPPORT_IDLE;
             target_warrior = nullptr;
+            isMoving = false;
+            path.clear();
             break;
         }
-        if (!isMoving) {
+
+        // Check if already near warrior
+        if (isNear(warriorPos)) {
+            // Reached warrior, apply effect
+            ApplyEffect(target_warrior);
+            current_support_state = SUPPORT_IDLE;
+            target_warrior = nullptr;
+            isMoving = false;
+            path.clear();
+        }
+        else if (!isMoving && path.empty()) {
+            // Not near warrior and not moving, start moving
             SetTarget(warriorPos.x, warriorPos.y, map, securityMap);
+
+            // If still not moving after SetTarget, pathfinding failed
             if (!isMoving) {
+                // Can't reach warrior, abort mission
                 current_support_state = SUPPORT_IDLE;
                 target_warrior = nullptr;
             }
         }
-        else if (isNear(warriorPos)) {
-            ApplyEffect(target_warrior); // Give ammo or heal
-            current_support_state = SUPPORT_IDLE;
-            target_warrior = nullptr;
-        }
+        // else: currently moving toward warrior, let Move() handle it
         break;
 
     default:
+        // Invalid state, reset
         current_support_state = SUPPORT_IDLE;
         target_warrior = nullptr;
         isMoving = false;

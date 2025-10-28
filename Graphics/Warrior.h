@@ -15,6 +15,8 @@ enum WarriorInternalState {
 	STATE_FINDING_COVER
 };
 
+const int SCAN_TIMEOUT_FRAMES = 120;
+
 class Warrior : public Soldier {
 private:
 	int bullet_ammo;
@@ -24,6 +26,7 @@ private:
 	Soldier* currentTargetEnemy; // For ENGAGING
 	WarriorInternalState currentInternalState;
 	int shoot_cooldown_timer = 0; // Timer for shooting cooldown
+	int scan_timer = 0;
 public:
 	Warrior(double start_x, double start_y, int team_id);
 

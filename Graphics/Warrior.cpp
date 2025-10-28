@@ -1,6 +1,7 @@
 #include "Warrior.h"
 #include "glut.h"
 #include <math.h>
+#include <sstream>
 
 Warrior::Warrior(double start_x, double start_y, int team_id) : Soldier(start_x, start_y, team_id)
 {
@@ -15,6 +16,8 @@ Warrior::Warrior(double start_x, double start_y, int team_id) : Soldier(start_x,
 
 void Warrior::Show()
 {
+	Soldier::Show();
+
 	if (!isAlive) return;
 
 	if (team == 0)
@@ -41,23 +44,56 @@ void Warrior::Show()
 	glRasterPos2d(x + 0.1, y + 0.1);
 
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'W');
+
+	// Draw Ammo Count
+	glColor3d(0.1, 0.1, 0.1);
+	glRasterPos2d(x - 1, y - 0.7); // Position below the square
+
+	// Create ammo string
+	std::stringstream ss;
+	ss << "B:" << bullet_ammo << " G:" << grenade_ammo;
+	std::string ammo_str = ss.str();
+
+	// Draw each character of the string
+	for (char c : ammo_str) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c); // Use a small font
+	}
+
 }
 
 Bullet* Warrior::Shoot(Soldier* target)
 {
-	if (bullet_ammo <= 0)
+	// Check ammo and target validity
+	if (bullet_ammo <= 0 || target == nullptr || !target->IsAlive()) {
 		return nullptr;
-
-	Point2D target_pos = target->getPosition();
-
-	double distance = sqrt(pow(target_pos.x - x, 2) + pow(target_pos.y - y, 2));
-
-	if (distance <= WARRIOR_FIRING_RANGE) {
-		bullet_ammo--;
-		double angle = atan2(target_pos.y - y, target_pos.x - x);
-		return new Bullet(x + 0.5, y + 0.5, angle, this);
 	}
-	return nullptr;
+
+	// Use precise coordinates for calculations
+	double target_x_precise = target->getX();
+	double target_y_precise = target->getY();
+
+	// Calculate squared distance for efficiency (precise shooter to precise target)
+	double dx_dist = target_x_precise - x;
+	double dy_dist = target_y_precise - y;
+	double dist_sq = dx_dist * dx_dist + dy_dist * dy_dist; // Use squared distance
+
+	// Check range using squared distance
+	// Add a small tolerance (e.g., half a unit squared) to prevent range issues at edge cases
+	double range_sq_with_tolerance = (WARRIOR_FIRING_RANGE + 0.5) * (WARRIOR_FIRING_RANGE + 0.5);
+
+	if (dist_sq <= range_sq_with_tolerance) {
+		bullet_ammo--;
+
+		double angle = atan2((target_y_precise + 0.5) - (y + 0.5),
+			(target_x_precise + 0.5) - (x + 0.5));
+
+		// Create bullet, passing 'this' as the shooter
+		Bullet* new_bullet = new Bullet(x + 0.5, y + 0.5, angle, this); // Pass 'this'
+		new_bullet->setIsMoving(true); // Activate the bullet
+
+		return new_bullet;
+	}
+	return nullptr; // Target out of range
 }
 
 Grenade* Warrior::ThrowGrenade(Soldier* target)
@@ -119,7 +155,9 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		shoot_cooldown_timer--;
 	}
 
-	// if commander is dead
+	CalculateVisibility(this, map, visibility);
+
+	// if commander is dead, always look for enemies when idle
 	if (!is_commander_alive && currentInternalState == STATE_IDLE) {
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
 		if (enemy) {
@@ -138,18 +176,36 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 				currentInternalState = STATE_ENGAGING;
 			}
 		}
+		else
+			printf("hello\n");
+			currentInternalState = STATE_SCANNING_AREA;
 		break;
 
 	case STATE_MOVING:
+	{
+		//printf("moving\n");
+		// Validate target location before pathfinding
+		if (targetLocation.x < 0 || targetLocation.x >= MSZ ||
+			targetLocation.y < 0 || targetLocation.y >= MSZ) {
+			// Invalid target, go idle
+			currentInternalState = STATE_IDLE;
+			break;
+		}
+
 		// Move toward target location
 		if (!isMoving && path.empty()) {
 			SetTarget(targetLocation.x, targetLocation.y, map, securityMap);
 		}
-		//Move(map);
 
 		// If reached destination, switch state
 		if (!isMoving && path.empty()) {
-			currentInternalState = (currentCommand == ATTACK) ? STATE_SCANNING_AREA : STATE_IDLE;
+			if (currentCommand == ATTACK) {
+				currentInternalState = STATE_SCANNING_AREA;
+				scan_timer = 0; // Reset scan timer when entering scanning
+			}
+			else {
+				currentInternalState = STATE_IDLE;
+			}
 		}
 
 		// While moving to ATTACK area, check for enemies
@@ -163,38 +219,68 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 			}
 		}
 		break;
+	}
 
 	case STATE_SCANNING_AREA:
-		// Look for visible enemies
 	{
+		// Keep scanning for enemies over time
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
 		if (enemy) {
 			currentTargetEnemy = enemy;
 			currentInternalState = STATE_ENGAGING;
+			scan_timer = 0;
+			break;
 		}
-		else {
-			// No enemies found, stay idle
-			currentInternalState = STATE_IDLE;
-			currentCommand = IDLE;
+
+		// Only update scan behavior when NOT actively moving
+		if (!isMoving && path.empty()) {
+			scan_timer++;
+
+			if (scan_timer > SCAN_TIMEOUT_FRAMES) {
+				// After timeout, pick a new random nearby position
+				Point2D pos = getPosition();
+				int dx = (rand() % 7) - 3; // -3..3
+				int dy = (rand() % 7) - 3;
+				Point2D new_target = { pos.x + dx, pos.y + dy };
+
+				// Clamp to map bounds
+				if (new_target.x < 0) new_target.x = 0;
+				else if (new_target.x >= MSZ) new_target.x = MSZ - 1;
+
+				if (new_target.y < 0) new_target.y = 0;
+				else if (new_target.y >= MSZ) new_target.y = MSZ - 1;
+
+				// Only set new target if it's different from current position
+				if (new_target.x != pos.x || new_target.y != pos.y) {
+					SetTarget(new_target.x, new_target.y, map, securityMap);
+				}
+
+				scan_timer = 0; // Reset timer
+			}
 		}
+		// Stay in scanning state
+		break;
 	}
-	break;
 
 	case STATE_ENGAGING:
 	{
 		if (!currentTargetEnemy || !currentTargetEnemy->IsAlive()) {
 			// Target lost or dead
 			currentTargetEnemy = nullptr;
-			currentInternalState = STATE_IDLE;
+			// Return to scanning if we were in ATTACK mode, otherwise idle
+			currentInternalState = (currentCommand == ATTACK) ? STATE_SCANNING_AREA : STATE_IDLE;
+			scan_timer = 0;
 			break;
 		}
 
 		// Check if target is visible
 		Point2D tgtPos = currentTargetEnemy->getPosition();
+
 		if (!visibility[tgtPos.y][tgtPos.x]) {
 			// Lost sight
 			currentTargetEnemy = nullptr;
 			currentInternalState = (currentCommand == ATTACK) ? STATE_SCANNING_AREA : STATE_IDLE;
+			scan_timer = 0;
 			break;
 		}
 
@@ -211,7 +297,6 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 			if (!isMoving || path.empty()) {
 				SetTarget(attackPos.x, attackPos.y, map, securityMap);
 			}
-			//Move(map);
 		}
 		else {
 			// In range, shoot
@@ -219,8 +304,7 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 				Bullet* new_bullet = Shoot(currentTargetEnemy);
 				if (new_bullet != nullptr) {
 					new_bullet->setIsMoving(true);
-					//printf("Warrior at (%.1f, %.1f) shooting at enemy at (%.1f, %.1f)\n", x, y, currentTargetEnemy->getX(), currentTargetEnemy->getY());
-					active_bullets.push_back(new_bullet); // Add to global list
+					active_bullets.push_back(new_bullet);
 				}
 				shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
 			}

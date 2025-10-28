@@ -6,6 +6,8 @@ Point2D MedicalWarehouse1 = { MSZ - 3, MSZ - 3 };
 
 void Medic::Show()
 {
+	Soldier::Show();
+
 	if (!isAlive) return;
 
 	if (team == 0)

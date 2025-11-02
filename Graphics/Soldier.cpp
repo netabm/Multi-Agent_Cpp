@@ -8,6 +8,13 @@ Soldier::Soldier(double start_x, double start_y, int team_id) {
 	health = 100;
 	isAlive = true;
 	isMoving = false;
+
+	// Initialize per-soldier visibility map
+	for (int i = 0; i < MSZ; ++i) {
+		for (int j = 0; j < MSZ; ++j) {
+			visibility[i][j] = false;
+		}
+	}
 }
 
 void Soldier::Show() {

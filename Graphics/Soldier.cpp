@@ -45,9 +45,20 @@ void Soldier::Show() {
 void Soldier::SetTarget(int target_x, int target_y, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
 	Point2D start = { (int)x, (int)y };
 	Point2D target = { target_x, target_y };
+
+	// Don't pathfind if already at target
+	if (start.x == target.x && start.y == target.y) {
+		path.clear();
+		isMoving = false;
+		return;
+	}
+
 	path = AStar(start, target, map, securityMap);
 	if (!path.empty()) {
 		isMoving = true;
+	}
+	else {
+		isMoving = false;
 	}
 }
 
@@ -58,24 +69,33 @@ void Soldier::Move(int map[MSZ][MSZ]) {
 		isMoving = false;
 		return;
 	}
+
 	Point2D waypoint = path.back();
 	double dest_x = waypoint.x + 0.5;
 	double dest_y = waypoint.y + 0.5;
-	double dirX = dest_x - x;
-	double dirY = dest_y - y;
-	double mag = sqrt(dirX * dirX + dirY * dirY);
-	if (mag > 0) {
-		dirX /= mag;
-		dirY /= mag;
-	}
-	x += dirX * SPEED;
-	y += dirY * SPEED;
-	if (sqrt(pow(dest_x - x, 2) + pow(dest_y - y, 2)) < SPEED) {
+
+	// Check if already at destination
+	if (sqrt(pow(dest_x - x, 2) + pow(dest_y - y, 2)) < SPEED * 0.5) {
+		x = dest_x;  // Snap to exact position
+		y = dest_y;
 		path.pop_back();
 		if (path.empty()) {
 			isMoving = false;
 		}
+		return;  // Important: return after reaching waypoint
 	}
+
+	double dirX = dest_x - x;
+	double dirY = dest_y - y;
+	double mag = sqrt(dirX * dirX + dirY * dirY);
+
+	if (mag > 0) {
+		dirX /= mag;
+		dirY /= mag;
+	}
+
+	x += dirX * SPEED;
+	y += dirY * SPEED;
 }
 
 bool Soldier::isNear(const Point2D& cell, double threshold) const {

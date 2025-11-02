@@ -37,6 +37,7 @@ public:
 	int getAmmo() const { return bullet_ammo; };
 	void reloadAmmo() { bullet_ammo = W_NUM_BULLETS; };
 	void heal() { health = 100; };
+	WarriorInternalState getCurrentInternalState() const { return currentInternalState; }
 
 
 	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]);

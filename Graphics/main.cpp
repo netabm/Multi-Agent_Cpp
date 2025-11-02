@@ -96,6 +96,7 @@ void InitMap()
 
 	// Top-right corner rocks
 	map[40][40] = STONE; map[43][42] = STONE;
+	map[41][40] = STONE; map[41][42] = STONE;
 	map[40][41] = STONE; map[41][41] = STONE;
 	map[40][42] = STONE; map[41][43] = STONE;
 	map[42][42] = STONE;
@@ -402,7 +403,7 @@ void DrawVisibilityMap()
 		relevant_commander = c0;
 		visibility_map = c0->getTeamVisibility();
 	}
-	else if (teamToShow == 1 && c1 != nullptr && c1->IsAlive()) { // Need pointer c1
+	else if (teamToShow == 1 && c1 != nullptr && c1->IsAlive()) {
 		relevant_commander = c1;
 		visibility_map = c1->getTeamVisibility();
 	}
@@ -499,7 +500,7 @@ void DrawSightLines()
 	glLineWidth(1.0); // Reset line width
 }
 
-void displayTeamVisibility() // Renamed from displayVisibilityMap for clarity
+void displayTeamVisibility()
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -520,7 +521,6 @@ void displayTeamVisibility() // Renamed from displayVisibilityMap for clarity
 
 	glutSwapBuffers();
 }
-
 
 void idle()
 {

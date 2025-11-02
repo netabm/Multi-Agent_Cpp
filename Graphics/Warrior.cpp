@@ -157,129 +157,185 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 
 	CalculateVisibility(this, map, visibility);
 
-	// if commander is dead, always look for enemies when idle
-	if (!is_commander_alive && currentInternalState == STATE_IDLE) {
-		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-		if (enemy) {
-			currentTargetEnemy = enemy;
+	// Validate currentTargetEnemy
+	if (currentTargetEnemy != nullptr) {
+		bool targetStillValid = false;
+		for (Soldier* s : all_soldiers) {
+			if (s == currentTargetEnemy && s->IsAlive()) {
+				targetStillValid = true;
+				break;
+			}
+		}
+		if (!targetStillValid) {
+			currentTargetEnemy = nullptr;
+			if (currentInternalState == STATE_ENGAGING) {
+				currentInternalState = STATE_SCANNING_AREA;
+				scan_timer = 0;
+			}
+		}
+	}
+
+	// HIGHEST PRIORITY: Check for visible enemies EVERY frame
+	Soldier* visibleEnemy = FindClosestVisibleEnemy(all_soldiers);
+	if (visibleEnemy) {
+		// Only switch to engaging if we're not already engaging this target
+		if (currentInternalState != STATE_ENGAGING || currentTargetEnemy != visibleEnemy) {
+			currentTargetEnemy = visibleEnemy;
 			currentInternalState = STATE_ENGAGING;
+			// Don't clear path here - let STATE_ENGAGING handle movement
+		}
+	}
+	else {
+		// NO enemies visible - clear any ATTACK commands from commander
+		// This prevents warriors from going to stale enemy positions
+		if (currentCommand == ATTACK) {
+			currentCommand = IDLE;
+			targetLocation = { -1, -1 };
 		}
 	}
 
 	switch (currentInternalState) {
 	case STATE_IDLE:
-		// Scan for enemies if commander is dead
-		if (!is_commander_alive) {
-			Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-			if (enemy) {
-				currentTargetEnemy = enemy;
-				currentInternalState = STATE_ENGAGING;
-			}
-		}
-		else
-			printf("hello\n");
-			currentInternalState = STATE_SCANNING_AREA;
+		// Start scanning/patrolling
+		currentInternalState = STATE_SCANNING_AREA;
 		break;
 
 	case STATE_MOVING:
 	{
-		//printf("moving\n");
-		// Validate target location before pathfinding
+		// This state is ONLY for moving to commander-designated locations when NO enemy is visible
+		printf("Warrior at (%.2f, %.2f) moving to target ( %d, %d )...\n", x, y, targetLocation.x, targetLocation.y);
+
+		// Validate target location
 		if (targetLocation.x < 0 || targetLocation.x >= MSZ ||
 			targetLocation.y < 0 || targetLocation.y >= MSZ) {
-			// Invalid target, go idle
-			currentInternalState = STATE_IDLE;
+			currentInternalState = STATE_SCANNING_AREA;
 			break;
 		}
 
-		// Move toward target location
+		// Start moving if not already
 		if (!isMoving && path.empty()) {
 			SetTarget(targetLocation.x, targetLocation.y, map, securityMap);
 		}
 
-		// If reached destination, switch state
-		if (!isMoving && path.empty()) {
-			if (currentCommand == ATTACK) {
-				currentInternalState = STATE_SCANNING_AREA;
-				scan_timer = 0; // Reset scan timer when entering scanning
-			}
-			else {
-				currentInternalState = STATE_IDLE;
-			}
-		}
+		// Check if reached destination
+		Point2D currentPos = getPosition();
+		double distToTarget = hypot(currentPos.x - targetLocation.x, currentPos.y - targetLocation.y);
 
-		// While moving to ATTACK area, check for enemies
-		if (currentCommand == ATTACK) {
-			Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-			if (enemy) {
-				currentTargetEnemy = enemy;
-				currentInternalState = STATE_ENGAGING;
-				path.clear();
-				isMoving = false;
-			}
+		if (distToTarget < 2.0 || (!isMoving && path.empty())) {
+			// Reached commander's target location - start scanning area
+			currentInternalState = STATE_SCANNING_AREA;
+			scan_timer = 0;
 		}
 		break;
 	}
 
 	case STATE_SCANNING_AREA:
 	{
-		// Keep scanning for enemies over time
-		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-		if (enemy) {
-			currentTargetEnemy = enemy;
-			currentInternalState = STATE_ENGAGING;
-			scan_timer = 0;
-			break;
-		}
+		printf("Warrior at (%.2f, %.2f) scanning area...\n", x, y);
 
-		// Only update scan behavior when NOT actively moving
-		if (!isMoving && path.empty()) {
-			scan_timer++;
+		// If commander gives a MOVE command and we're not currently moving, accept it
+		if (is_commander_alive && currentCommand == ATTACK && (!isMoving || path.empty())) {
+			// Check if commander's target is far enough to warrant going there
+			Point2D currentPos = getPosition();
+			double distToCommandTarget = hypot(currentPos.x - targetLocation.x,
+				currentPos.y - targetLocation.y);
 
-			if (scan_timer > SCAN_TIMEOUT_FRAMES) {
-				// After timeout, pick a new random nearby position
-				Point2D pos = getPosition();
-				int dx = (rand() % 7) - 3; // -3..3
-				int dy = (rand() % 7) - 3;
-				Point2D new_target = { pos.x + dx, pos.y + dy };
-
-				// Clamp to map bounds
-				if (new_target.x < 0) new_target.x = 0;
-				else if (new_target.x >= MSZ) new_target.x = MSZ - 1;
-
-				if (new_target.y < 0) new_target.y = 0;
-				else if (new_target.y >= MSZ) new_target.y = MSZ - 1;
-
-				// Only set new target if it's different from current position
-				if (new_target.x != pos.x || new_target.y != pos.y) {
-					SetTarget(new_target.x, new_target.y, map, securityMap);
-				}
-
-				scan_timer = 0; // Reset timer
+			if (distToCommandTarget > 8.0) {
+				currentInternalState = STATE_MOVING;
+				break;
 			}
 		}
-		// Stay in scanning state
+
+		// Continue autonomous patrol - pick new destination when not moving
+		if (!isMoving && path.empty()) {
+			Point2D currentPos = getPosition();
+			Point2D patrol_target = { -1, -1 };
+
+			// Try to find a valid patrol target
+			int attempts = 0;
+			while (attempts < 30) {
+				patrol_target.x = rand() % MSZ;
+				patrol_target.y = rand() % MSZ;
+
+				// Skip if it's our current position
+				if (patrol_target.x == currentPos.x && patrol_target.y == currentPos.y) {
+					attempts++;
+					continue;
+				}
+
+				// Check if it's walkable
+				if (map[patrol_target.y][patrol_target.x] != STONE &&
+					map[patrol_target.y][patrol_target.x] != WATER) {
+					// Calculate distance from current position
+					double dist = hypot(patrol_target.x - currentPos.x,
+						patrol_target.y - currentPos.y);
+
+					// Accept if it's reasonably far
+					if (dist > 8.0) {
+						break;
+					}
+				}
+				attempts++;
+			}
+
+			// Set target if valid
+			if (patrol_target.x != -1 && patrol_target.y != -1 &&
+				(patrol_target.x != currentPos.x || patrol_target.y != currentPos.y) &&
+				map[patrol_target.y][patrol_target.x] != STONE &&
+				map[patrol_target.y][patrol_target.x] != WATER) {
+				SetTarget(patrol_target.x, patrol_target.y, map, securityMap);
+			}
+			else {
+				// Fallback: pick ANY valid spot
+				for (int i = 0; i < 100; i++) {
+					int rx = rand() % MSZ;
+					int ry = rand() % MSZ;
+					if ((rx != currentPos.x || ry != currentPos.y) &&
+						map[ry][rx] != STONE && map[ry][rx] != WATER) {
+						SetTarget(rx, ry, map, securityMap);
+						break;
+					}
+				}
+			}
+		}
 		break;
 	}
 
 	case STATE_ENGAGING:
 	{
-		if (!currentTargetEnemy || !currentTargetEnemy->IsAlive()) {
-			// Target lost or dead
-			currentTargetEnemy = nullptr;
-			// Return to scanning if we were in ATTACK mode, otherwise idle
-			currentInternalState = (currentCommand == ATTACK) ? STATE_SCANNING_AREA : STATE_IDLE;
+		printf("Warrior at (%.2f, %.2f) engaging enemy!\n", x, y);
+
+		// Double-check target is still valid
+		if (!currentTargetEnemy) {
+			currentInternalState = STATE_SCANNING_AREA;
 			scan_timer = 0;
 			break;
 		}
 
-		// Check if target is visible
+		// Verify target still exists and is alive
+		bool targetExists = false;
+		for (Soldier* s : all_soldiers) {
+			if (s == currentTargetEnemy && s->IsAlive()) {
+				targetExists = true;
+				break;
+			}
+		}
+
+		if (!targetExists) {
+			currentTargetEnemy = nullptr;
+			currentInternalState = STATE_SCANNING_AREA;
+			scan_timer = 0;
+			break;
+		}
+
+		// Check if target is still visible
 		Point2D tgtPos = currentTargetEnemy->getPosition();
 
-		if (!visibility[tgtPos.y][tgtPos.x]) {
+		if (tgtPos.x < 0 || tgtPos.x >= MSZ || tgtPos.y < 0 || tgtPos.y >= MSZ ||
+			!visibility[tgtPos.y][tgtPos.x]) {
 			// Lost sight
 			currentTargetEnemy = nullptr;
-			currentInternalState = (currentCommand == ATTACK) ? STATE_SCANNING_AREA : STATE_IDLE;
+			currentInternalState = STATE_SCANNING_AREA;
 			scan_timer = 0;
 			break;
 		}
@@ -289,17 +345,33 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		double dy = tgtPos.y + 0.5 - y;
 		double dist = hypot(dx, dy);
 
-		// Determine attack position
-		Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map);
-
 		if (dist > WARRIOR_FIRING_RANGE) {
-			// Move toward attack position
-			if (!isMoving || path.empty()) {
+			// Too far - need to move closer
+			// Calculate best attack position
+			Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map);
+
+			// Only recalculate path if we don't have one or target moved significantly
+			Point2D currentPos = getPosition();
+			bool needNewPath = path.empty() || !isMoving;
+
+			if (!needNewPath && !path.empty()) {
+				// Check if our current path endpoint is still near the attack position
+				Point2D pathEnd = path.front(); // First element is the final destination
+				double pathEndDist = hypot(pathEnd.x - attackPos.x, pathEnd.y - attackPos.y);
+				if (pathEndDist > 3.0) {
+					needNewPath = true;
+				}
+			}
+
+			if (needNewPath) {
 				SetTarget(attackPos.x, attackPos.y, map, securityMap);
 			}
 		}
 		else {
-			// In range, shoot
+			// In range - stop moving and shoot
+			path.clear();
+			isMoving = false;
+
 			if (shoot_cooldown_timer == 0) {
 				Bullet* new_bullet = Shoot(currentTargetEnemy);
 				if (new_bullet != nullptr) {
@@ -313,16 +385,26 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 	}
 
 	case STATE_FINDING_COVER:
-		// TODO: BFS to safe spot
-		// Placeholder: return to idle if no BFS implemented
-		currentInternalState = STATE_IDLE;
-		currentCommand = IDLE;
+		currentInternalState = STATE_SCANNING_AREA;
+		currentTargetEnemy = nullptr;
+		scan_timer = 0;
 		break;
 	}
 }
 
 Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]) {
+	// SAFETY CHECK: Verify target is valid
+	if (!target || !target->IsAlive()) {
+		return getPosition(); // Return current position if invalid
+	}
+
 	Point2D targetPos = target->getPosition();
+
+	// SAFETY CHECK: Verify position is valid
+	if (targetPos.x < 0 || targetPos.x >= MSZ || targetPos.y < 0 || targetPos.y >= MSZ) {
+		return getPosition();
+	}
+
 	Point2D currentPos = getPosition();
 	Point2D bestPos = { -1, -1 };
 	double minDistSqToWarrior = 1e9;
@@ -350,8 +432,8 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]) {
 	}
 
 	if (bestPos.x == -1) {
-		// fallback: move toward target
-		return targetPos;
+		// fallback: return current position (don't chase invalid target)
+		return currentPos;
 	}
 
 	return bestPos;

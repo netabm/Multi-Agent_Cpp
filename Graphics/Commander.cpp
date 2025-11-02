@@ -119,8 +119,8 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
+	targetLocation = { -1, -1 };
     if (!isAlive) return;
-
     CalculateTeamVisibility(team_soldiers, getTeam(), map, team_visibility);
     CheckAmmo(team_soldiers, map, securityMap);
     CheckHealth(team_soldiers, map, securityMap);
@@ -148,21 +148,17 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
     }
     bool enemyVisible = !visibleEnemies.empty();
 
-    // Decide command
-    if (!enemyVisible) {
-        currentCommand = IDLE;  // Just go IDLE when no enemies
-    }
-    else {
+    // Only give commands when enemies are visible
+    if (enemyVisible) {
         if (avgHealth < 40) {
             currentCommand = DEFEND;
+            // Calculate safe position if needed
         }
         else {
             currentCommand = ATTACK;
         }
-    }
 
-    // Determine target location
-    if (currentCommand == ATTACK && enemyVisible) {
+        // Calculate target location (enemy centroid)
         double avgX = 0, avgY = 0;
         for (Soldier* e : visibleEnemies) {
             avgX += e->getX();
@@ -171,30 +167,15 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
         avgX /= visibleEnemies.size();
         avgY /= visibleEnemies.size();
         targetLocation = { (int)avgX, (int)avgY };
-    }
-    else if (currentCommand == MOVE) {
-        double avgX = 0, avgY = 0;
+
+        // Give commands to Warriors
         for (Soldier* s : team_soldiers) {
-            if (s->IsAlive()) {
-                avgX += s->getX();
-                avgY += s->getY();
+            if (!s->IsAlive()) continue;
+            Warrior* w = dynamic_cast<Warrior*>(s);
+            if (w && w->getCurrentInternalState() == STATE_IDLE) {
+                w->SetCommand(currentCommand, targetLocation);
             }
         }
-        if (aliveCount > 0) {
-            avgX /= aliveCount;
-            avgY /= aliveCount;
-            targetLocation = { (int)avgX, (int)avgY };
-        }
     }
-    // DEFEND or IDLE: keep last position or do nothing
-
-    // Give commands only to Warriors
-    for (Soldier* s : team_soldiers) {
-        if (!s->IsAlive()) continue;
-
-        Warrior* w = dynamic_cast<Warrior*>(s);
-        if (w) {
-            w->SetCommand(currentCommand, targetLocation);
-        }
-    }
+    // If no enemies visible, don't send commands - warriors will patrol autonomously
 }

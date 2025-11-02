@@ -56,30 +56,23 @@ void Bullet::Show()
 
 void Bullet::UpdateSecurityMap(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
-	double currentX = x;
-	double currentY = y;
-	double distance_traveled = 0;
+	int cx = (int)x;
+	int cy = (int)y;
 
-	// Keep simulating the bullet's path as long as it's within its range
-	while (distance_traveled < B_RANGE)
-	{
-		// Move one step forward
-		currentX += B_SPEED * dirX;
-		currentY += B_SPEED * dirY;
+	// Only update if the bullet has entered a new cell
+	if (cx == lastCellX && cy == lastCellY)
+		return;
 
-		// Check for obstacles or map boundaries
-		if (currentX < 0 || currentX >= MSZ || currentY < 0 || currentY >= MSZ ||
-			map[(int)currentY][(int)currentX] == STONE || map[(int)currentY][(int)currentX] == TREE)
-		{
-			break; // Stop the loop if the bullet hits something
-		}
+	lastCellX = cx;
+	lastCellY = cy;
 
-		// If the path is clear, update the security map at this point
-		securityMap[(int)currentY][(int)currentX] += SECURITY;
+	// Skip invalid or blocked cells
+	if (cx < 0 || cx >= MSZ || cy < 0 || cy >= MSZ)
+		return;
+	if (map[cy][cx] == STONE || map[cy][cx] == TREE)
+		return;
 
-		// Recalculate the total distance traveled from the origin
-		double dx = currentX - originX;
-		double dy = currentY - originY;
-		distance_traveled = sqrt(dx * dx + dy * dy);
-	}
+	// Update the security map once for this cell
+	securityMap[cy][cx] += SECURITY;
 }
+

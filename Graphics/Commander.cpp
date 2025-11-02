@@ -180,11 +180,8 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 				Warrior* w = dynamic_cast<Warrior*>(s);
 				if (!w) continue;
 
-				if (w->getCurrentInternalState() == STATE_IDLE) {
-					w->SetCommand(currentCommand, targetLocation);
-				}
-
-				if (w->getCurrentInternalState() == STATE_SCANNING_AREA) {
+				auto state = w->getCurrentInternalState();
+				if (state == STATE_IDLE || state == STATE_SCANNING_AREA) {
 					w->SetCommand(currentCommand, targetLocation);
 				}
 			}

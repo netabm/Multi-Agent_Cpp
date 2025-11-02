@@ -151,6 +151,11 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 {
 	if (!IsAlive()) return;
 
+	if (!is_commander_alive && currentCommand != IDLE) {
+		currentCommand = IDLE;
+		targetLocation = { -1, -1 };
+	}
+
 	// --- Cooldowns ---
 	if (shoot_cooldown_timer > 0) shoot_cooldown_timer--;
 

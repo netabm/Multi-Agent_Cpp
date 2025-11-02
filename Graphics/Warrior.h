@@ -37,6 +37,7 @@ public:
 	int getAmmo() const { return bullet_ammo; };
 	void reloadAmmo() { bullet_ammo = W_NUM_BULLETS; };
 	void heal() { health = 100; };
+	WarriorInternalState getCurrentInternalState() const { return currentInternalState; }
 
 
 	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]);
@@ -45,4 +46,10 @@ public:
 	void SetCommand(CommandType cmd, Point2D location);
 	// Fixed signature: accept the real grenades vector type
 	void Update(bool is_commander_alive, const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+
+	void HandleMoving(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+	void HandleScanning(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+	void HandleEngaging(std::vector<Bullet*>& active_bullets, int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
+	void HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+
 };

@@ -203,7 +203,6 @@ void InitMap()
 
 void init()
 {
-	// keep srand but map deterministic above
 	srand((unsigned)time(0));
 	glClearColor(0, 0.5, 0.8, 0);// color of window background
 	glOrtho(0, MSZ, 0, MSZ, -1, 1); // set the coordinates system
@@ -524,7 +523,7 @@ void displayTeamVisibility()
 
 void idle()
 {
-	// 1. Let commanders make decisions (so they can assign orders)
+	// Update commanders
 	for (Soldier* s : soldiers) {
 		Commander* cmd = dynamic_cast<Commander*>(s);
 		if (cmd && cmd->IsAlive()) {
@@ -533,7 +532,7 @@ void idle()
 		}
 	}
 
-	// 2. Update soldiers: Warriors process orders (ai), others just move
+	// Update soldiers
 	for (Soldier* s : soldiers) {
 		Warrior* w = dynamic_cast<Warrior*>(s);
 		if (w && w->IsAlive()) {
@@ -555,7 +554,7 @@ void idle()
 			s->Move(map);
 		}
 	}
-	// 3. Update projectiles and grenades
+	// Update projectiles and grenades
 	for (Grenade* g : active_grenades) {
 		g->Explode(map);
 	}
@@ -563,9 +562,10 @@ void idle()
 		b->Move(map);
 	}
 
-	// 4. Collision: bullets -> soldiers
+	// Collision: bullets -> soldiers
 	for (Bullet* bullet : active_bullets) {
 		if (bullet->getIsMoving()) {
+			bullet->UpdateSecurityMap(map, securityMap);
 			//printf("bullet is here\n");
 			for (Soldier* soldier : soldiers) {
 				if (soldier != bullet->getShooter() && soldier->IsAlive()) {
@@ -584,11 +584,12 @@ void idle()
 		}
 	}
 
-	// 5. Collision: grenade bullets -> soldiers
+	// Collision: grenade bullets -> soldiers
 	for (Grenade* grenade : active_grenades) {
 		Bullet** bullets_from_grenade = grenade->getBullets();
 		for (int i = 0; i < NUM_BULLETS; i++) {
 			if (bullets_from_grenade[i]->getIsMoving()) {
+				bullets_from_grenade[i]->UpdateSecurityMap(map, securityMap);
 				for (Soldier* soldier : soldiers) {
 					if (soldier->IsAlive()) {
 						double soldier_posX = soldier->getX();
@@ -607,7 +608,12 @@ void idle()
 		}
 	}
 
-	// 6. Remove stopped bullets
+	// Decay security map values
+	for (int i = 0; i < MSZ; i++)
+		for (int j = 0; j < MSZ; j++)
+			securityMap[i][j] *= 0.99995;
+
+	// Remove stopped bullets
 	active_bullets.erase(std::remove_if(active_bullets.begin(), active_bullets.end(),
 		[](Bullet* b) {
 			if (!b->getIsMoving()) {
@@ -617,7 +623,7 @@ void idle()
 			return false;
 		}), active_bullets.end());
 
-	// 7. Remove dead soldiers
+	// Remove dead soldiers
 	soldiers.erase(std::remove_if(soldiers.begin(), soldiers.end(),
 		[](Soldier* s) {
 			if (!s->IsAlive()) {

@@ -2,7 +2,7 @@
 #include "Definitions.h"
 #include "Soldier.h"
 const double B_SPEED = 0.07;
-const double SECURITY = 0.003;
+const double SECURITY = 0.03;
 const double B_RANGE = 7.0;
 
 class Bullet
@@ -13,6 +13,8 @@ private:
 	double dirX, dirY;
 	double originX, originY;
 	Soldier* shooter;
+	int lastCellX = -1;
+	int lastCellY = -1;
 public:
 	Bullet(double xPos, double yPos, double angle, Soldier* Shooter);
 	void Move(int map[MSZ][MSZ]);

@@ -6,6 +6,8 @@
 const int W_NUM_BULLETS = 20;
 const int W_NUM_GRENADES = 3;
 const int WARRIOR_SHOOT_COOLDOWN_FRAMES = 180;
+const int WARRIOR_GRENADE_COOLDOWN_FRAMES = 500;
+const int SCAN_TIMEOUT_FRAMES = 120;
 
 enum WarriorInternalState {
 	STATE_IDLE,
@@ -15,8 +17,6 @@ enum WarriorInternalState {
 	STATE_FINDING_COVER
 };
 
-const int SCAN_TIMEOUT_FRAMES = 120;
-
 class Warrior : public Soldier {
 private:
 	int bullet_ammo;
@@ -25,7 +25,8 @@ private:
 	Point2D targetLocation; // For MOVE / ATTACK area
 	Soldier* currentTargetEnemy; // For ENGAGING
 	WarriorInternalState currentInternalState;
-	int shoot_cooldown_timer = 0; // Timer for shooting cooldown
+	int shoot_cooldown_timer = 0;
+	int grenade_cooldown_timer = 0;
 	int scan_timer = 0;
 public:
 	Warrior(double start_x, double start_y, int team_id);
@@ -49,7 +50,7 @@ public:
 
 	void HandleMoving(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 	void HandleScanning(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
-	void HandleEngaging(std::vector<Bullet*>& active_bullets, int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
+	void HandleEngaging(std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
 	void HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 
 };

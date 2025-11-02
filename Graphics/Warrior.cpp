@@ -158,6 +158,7 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 
 	// --- Cooldowns ---
 	if (shoot_cooldown_timer > 0) shoot_cooldown_timer--;
+	if (grenade_cooldown_timer > 0) grenade_cooldown_timer--;
 
 	// --- Update visibility ---
 	CalculateVisibility(this, map, visibility);
@@ -205,7 +206,7 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		break;
 
 	case STATE_ENGAGING:
-		HandleEngaging(active_bullets, map, securityMap, all_soldiers);
+		HandleEngaging(active_bullets, active_grenades, map, securityMap, all_soldiers);
 		break;
 
 	case STATE_FINDING_COVER:
@@ -254,6 +255,7 @@ void Warrior::HandleScanning(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 }
 
 void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
+	std::vector<Grenade*>& active_grenades,
 	int map[MSZ][MSZ],
 	double securityMap[MSZ][MSZ],
 	const std::vector<Soldier*>& all_soldiers)
@@ -277,19 +279,35 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	double dy = tgtPos.y + 0.5 - y;
 	double dist = hypot(dx, dy);
 
+	// --- GRENADE THROWING LOGIC ---
+	const double MIN_GRENADE_DISTANCE = 6.0; // don't throw too close
+	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
+	const double GRENADE_CHANCE = 0.3; // 30% chance to throw
+
+	if (dist >= MIN_GRENADE_DISTANCE &&
+		dist <= MAX_GRENADE_DISTANCE &&
+		grenade_ammo > 0 &&
+		grenade_cooldown_timer == 0 &&
+		((double)rand() / RAND_MAX) < GRENADE_CHANCE)
+	{
+		Grenade* g = ThrowGrenade(currentTargetEnemy);
+		if (g) {
+			g->setIsExploded(false);  // not exploded yet, will travel to target
+			active_grenades.push_back(g);
+			grenade_ammo--;
+			grenade_cooldown_timer = WARRIOR_GRENADE_COOLDOWN_FRAMES;
+		}
+	}
+
+	// --- MOVEMENT / ATTACK LOGIC ---
 	if (dist > WARRIOR_FIRING_RANGE) {
-		// --- THIS IS THE FIX ---
-		// Enemy is out of range, move closer.
 		Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map);
 
-		// Only find a new path if we aren't already moving
 		if (path.empty() || !isMoving) {
 			SetTarget(attackPos.x, attackPos.y, map, securityMap);
 		}
-		// (The actual Soldier::Move() is called from the main idle() loop)
 	}
 	else {
-		// In range: stop moving and shoot
 		path.clear();
 		isMoving = false;
 
@@ -302,7 +320,13 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
 		}
 	}
+
+	// --- DECREMENT GRENADE COOLDOWN ---
+	if (grenade_cooldown_timer > 0)
+		grenade_cooldown_timer--;
 }
+
+
 
 void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
@@ -310,8 +334,6 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	// For now, just patrol
 	//HandleScanning(map, securityMap);
 }
-
-
 
 Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]) {
 	// SAFETY CHECK: Verify target is valid

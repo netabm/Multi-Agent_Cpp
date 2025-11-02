@@ -611,7 +611,7 @@ void idle()
 	// Decay security map values
 	for (int i = 0; i < MSZ; i++)
 		for (int j = 0; j < MSZ; j++)
-			securityMap[i][j] *= 0.99995;
+			securityMap[i][j] *= 0.9999;
 
 	// Remove stopped bullets
 	active_bullets.erase(std::remove_if(active_bullets.begin(), active_bullets.end(),

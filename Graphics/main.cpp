@@ -11,7 +11,6 @@
 
 const int W = 600;
 const int H = 600; // window sizes
-const double PI = 3.14;
 int teamToShow = -1; // -1 = no team, 0 = team 0, 1 = team 1
 
 int map[MSZ][MSZ] = { 0 };
@@ -556,7 +555,7 @@ void idle()
 	}
 	// Update projectiles and grenades
 	for (Grenade* g : active_grenades) {
-		g->Explode(map);
+		g->Update(map);
 	}
 	for (Bullet* b : active_bullets) {
 		b->Move(map);
@@ -588,7 +587,9 @@ void idle()
 	for (Grenade* grenade : active_grenades) {
 		Bullet** bullets_from_grenade = grenade->getBullets();
 		for (int i = 0; i < NUM_BULLETS; i++) {
-			if (bullets_from_grenade[i]->getIsMoving()) {
+			// *** THIS IS THE FIX ***
+			// Must check if the bullet pointer is valid *before* trying to use it.
+			if (bullets_from_grenade[i] && bullets_from_grenade[i]->getIsMoving()) {
 				bullets_from_grenade[i]->UpdateSecurityMap(map, securityMap);
 				for (Soldier* soldier : soldiers) {
 					if (soldier->IsAlive()) {
@@ -643,14 +644,21 @@ void MouseClick(int button, int state, int x, int y)
 		int target_x = MSZ * x / (double)W;
 		int target_y = MSZ * (H - y - 1) / (double)H;
 
-		Grenade* pg = new Grenade(target_x, target_y, w01);
-		pg->setIsExploded(true);
-		pg->UpdateSecurityMap(map, securityMap);
-		active_grenades.push_back(pg);
+		if (w01 && w01->IsAlive())
+		{
+			// Create a grenade that travels from w01 to the target
+			Grenade* pg = new Grenade(w01->getX(), w01->getY(), target_x, target_y, w01);
 
+			// FOR DEBUG: Make the mouse-clicked one explode instantly
+			pg->ExplodeNow();
+
+			// pg->UpdateSecurityMap(map, securityMap); // UpdateSecurityMap is now called by Update()
+			active_grenades.push_back(pg);
+		}
+
+		// This test code is fine
 		if (!soldiers.empty())
 		{
-			// send target to first soldier (for testing)
 			soldiers[0]->SetTarget(target_x, target_y, map, securityMap);
 		}
 	}

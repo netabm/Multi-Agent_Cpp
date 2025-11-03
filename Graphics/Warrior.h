@@ -27,6 +27,7 @@ private:
 	WarriorInternalState currentInternalState;
 	int shoot_cooldown_timer = 0;
 	int grenade_cooldown_timer = 0;
+	int grenade_decision_timer = 0;
 	int scan_timer = 0;
 public:
 	Warrior(double start_x, double start_y, int team_id);

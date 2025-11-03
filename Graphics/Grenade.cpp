@@ -51,12 +51,14 @@ void Grenade::TriggerExplosion()
 	isExploded = true;
 
 	// Now create the shrapnel at the target location (x, y)
-	double angle, teta = (360.0 / NUM_BULLETS) * PI / 180.0;
-	for (int i = 0, angle = 0; i < NUM_BULLETS; i++, angle += teta)
+	double teta = (360.0 / NUM_BULLETS) * PI / 180.0;
+	for (int i = 0; i < NUM_BULLETS; i++)
 	{
+		double angle = i * teta; // proper radian angle
 		bullets[i] = new Bullet(x, y, angle, shooter);
-		bullets[i]->setIsMoving(true); // Activate the shrapnel
+		bullets[i]->setIsMoving(true);
 	}
+
 }
 
 // This is the new public "explode now" function for debug/mouse

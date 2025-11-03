@@ -106,7 +106,7 @@ Grenade* Warrior::ThrowGrenade(Soldier* target)
 
 	if (distance <= GRENADE_THROW_RANGE)
 	{
-		grenade_ammo--;
+		grenade_ammo--; 
 		return new Grenade(x + 0.5, y + 0.5, target_pos.x + 0.5, target_pos.y + 0.5, this);
 	}
 
@@ -282,7 +282,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	// --- GRENADE THROWING LOGIC ---
 	const double MIN_GRENADE_DISTANCE = 10.0;
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
-	const double GRENADE_CHANCE = 0.01; // 1% chance
+	const double GRENADE_CHANCE = 0.1; // 10% chance
 
 	// THROW GRENADE
 	if (dist >= MIN_GRENADE_DISTANCE &&
@@ -323,6 +323,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 		}
 	}
 }
+
 
 void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {

@@ -280,9 +280,9 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	double dist = hypot(dx, dy);
 
 	// --- GRENADE THROWING LOGIC ---
-	const double MIN_GRENADE_DISTANCE = 10.0;
+	const double MIN_GRENADE_DISTANCE = 8.0;
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
-	const double GRENADE_CHANCE = 0.1; // 10% chance
+	const double GRENADE_CHANCE = 0.008; // 48% chance (60 FPS * 0.008 = ~0.48 per second)
 
 	// THROW GRENADE
 	if (dist >= MIN_GRENADE_DISTANCE &&

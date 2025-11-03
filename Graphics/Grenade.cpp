@@ -60,3 +60,22 @@ void Grenade::UpdateSecurityMap(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 	}
 
 }
+
+void Grenade::Move(int map[MSZ][MSZ])
+{
+	if (isExploded) return;
+
+	double dx = targetX - x;
+	double dy = targetY - y;
+	double dist = hypot(dx, dy);
+
+	if (dist < 0.5) {
+		exploded = true; // reached target
+		Explode(map);    // create bullet fragments here
+	}
+	else {
+		x += GRENADE_SPEED * dx / dist;
+		y += GRENADE_SPEED * dy / dist;
+	}
+}
+

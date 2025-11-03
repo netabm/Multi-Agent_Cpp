@@ -13,6 +13,8 @@ private:
 	Soldier* shooter;
 public:
 	Grenade(double xPos, double yPos, Soldier* soldier);
+	void Move(int map[MSZ][MSZ]);
+	bool getIsExploded() { return isExploded; }
 	void Explode(int map[MSZ][MSZ]);
 	void setIsExploded(bool value);
 	Soldier* getShooter() { return shooter; }

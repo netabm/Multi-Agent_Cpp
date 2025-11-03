@@ -280,9 +280,9 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	double dist = hypot(dx, dy);
 
 	// --- GRENADE THROWING LOGIC ---
-	const double MIN_GRENADE_DISTANCE = 6.0; // don't throw too close
+	const double MIN_GRENADE_DISTANCE = 10.0; // don't throw too close
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
-	const double GRENADE_CHANCE = 0.3; // 30% chance to throw
+	const double GRENADE_CHANCE = 0.1; // 10% chance to throw
 
 	if (dist >= MIN_GRENADE_DISTANCE &&
 		dist <= MAX_GRENADE_DISTANCE &&
@@ -292,7 +292,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	{
 		Grenade* g = ThrowGrenade(currentTargetEnemy);
 		if (g) {
-			g->setIsExploded(false);  // not exploded yet, will travel to target
+			g->setIsExploded(true);  // not exploded yet, will travel to target
 			active_grenades.push_back(g);
 			grenade_ammo--;
 			grenade_cooldown_timer = WARRIOR_GRENADE_COOLDOWN_FRAMES;

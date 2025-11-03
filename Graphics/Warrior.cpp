@@ -107,7 +107,7 @@ Grenade* Warrior::ThrowGrenade(Soldier* target)
 	if (distance <= GRENADE_THROW_RANGE)
 	{
 		grenade_ammo--;
-		return new Grenade(target_pos.x, target_pos.y, this);
+		return new Grenade(x + 0.5, y + 0.5, target_pos.x + 0.5, target_pos.y + 0.5, this);
 	}
 
 	return nullptr;
@@ -280,37 +280,39 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	double dist = hypot(dx, dy);
 
 	// --- GRENADE THROWING LOGIC ---
-	const double MIN_GRENADE_DISTANCE = 10.0; // don't throw too close
+	const double MIN_GRENADE_DISTANCE = 10.0;
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
-	const double GRENADE_CHANCE = 0.1; // 10% chance to throw
+	const double GRENADE_CHANCE = 0.01; // 1% chance
 
+	// THROW GRENADE
 	if (dist >= MIN_GRENADE_DISTANCE &&
 		dist <= MAX_GRENADE_DISTANCE &&
 		grenade_ammo > 0 &&
 		grenade_cooldown_timer == 0 &&
 		((double)rand() / RAND_MAX) < GRENADE_CHANCE)
 	{
+		// ThrowGrenade() handles ammo decrement and creating the grenade
 		Grenade* g = ThrowGrenade(currentTargetEnemy);
 		if (g) {
-			g->setIsExploded(true);  // not exploded yet, will travel to target
 			active_grenades.push_back(g);
-			grenade_ammo--;
 			grenade_cooldown_timer = WARRIOR_GRENADE_COOLDOWN_FRAMES;
 		}
+		// Threw a grenade, so stop moving and wait
+		path.clear();
+		isMoving = false;
 	}
-
-	// --- MOVEMENT / ATTACK LOGIC ---
-	if (dist > WARRIOR_FIRING_RANGE) {
+	else if (dist > WARRIOR_FIRING_RANGE)
+	{
+		// Out of range, move
 		Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map);
-
 		if (path.empty() || !isMoving) {
 			SetTarget(attackPos.x, attackPos.y, map, securityMap);
 		}
 	}
-	else {
+	else
+	{
 		path.clear();
 		isMoving = false;
-
 		if (shoot_cooldown_timer == 0) {
 			Bullet* b = Shoot(currentTargetEnemy);
 			if (b) {
@@ -320,13 +322,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
 		}
 	}
-
-	// --- DECREMENT GRENADE COOLDOWN ---
-	if (grenade_cooldown_timer > 0)
-		grenade_cooldown_timer--;
 }
-
-
 
 void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {

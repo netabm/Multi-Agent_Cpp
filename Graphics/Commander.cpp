@@ -132,10 +132,11 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 	static Point2D previousTarget = { -1, -1 };
 
 	// Only give commands when enemies are visible
+	//printf("%s\n",enemyVisible ? "true" : "false");
 	if (enemyVisible) {
-		if (avgHealth < 40) {
+		if (avgHealth < 60) {
+			//printf("Defend\n");
 			currentCommand = DEFEND;
-			// Calculate safe position if needed
 		}
 		else {
 			currentCommand = ATTACK;
@@ -159,6 +160,10 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 				if (!w) continue;
 
 				auto state = w->getCurrentInternalState();
+
+				if (state == STATE_ENGAGING && currentCommand == DEFEND) {
+					w->SetCommand(currentCommand, targetLocation);
+				}
 				if (state == STATE_IDLE || state == STATE_SCANNING_AREA) {
 					w->SetCommand(currentCommand, targetLocation);
 				}
@@ -171,6 +176,7 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 		// No enemies visible: clear outstanding commands so warriors revert to autonomous patrol
 		if (previousCommand != IDLE || !(previousTarget == Point2D{ -1, -1 })) {
 			currentCommand = IDLE;
+			defend_reserved_spots.clear();
 			targetLocation = { -1, -1 };
 			for (Soldier* s : team_soldiers) {
 				if (!s->IsAlive()) continue;

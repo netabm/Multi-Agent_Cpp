@@ -10,7 +10,7 @@ protected:
     void Show();
 
     Point2D GetWarehousePosition() const override {
-        return (team == 0) ? Point2D{ 2,2 } : Point2D{ MSZ - 9, MSZ - 3 };
+        return (team == 0) ? Point2D{ 2,2 } : Point2D{ MSZ - 3, MSZ - 9 };
     }
 
     void ApplyEffect(Warrior* warrior) override {

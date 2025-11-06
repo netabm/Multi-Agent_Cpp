@@ -42,7 +42,7 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
 
     switch (current_support_state) {
     case SUPPORT_MOVING_TO_WAREHOUSE:
-        // FIX 2: Check if already at warehouse FIRST
+        // Check if already at warehouse FIRST
         if (isNear(warehouse)) {
             // Already at warehouse, proceed to next state
             current_support_state = SUPPORT_MOVING_TO_WARRIOR;

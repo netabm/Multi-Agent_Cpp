@@ -1,13 +1,14 @@
 #include "Warrior.h"
+#include "Commander.h"
 #include "glut.h"
 #include <math.h>
 #include <sstream>
 
-Warrior::Warrior(double start_x, double start_y, int team_id) : Soldier(start_x, start_y, team_id)
+Warrior::Warrior(double start_x, double start_y, int team_id, Commander* cmd)
+	: Soldier(start_x, start_y, team_id), commander(cmd)
 {
 	bullet_ammo = W_NUM_BULLETS;
 	grenade_ammo = W_NUM_GRENADES;
-	team = team_id;
 	currentCommand = IDLE;
 	targetLocation = { -1,-1 };
 	currentInternalState = STATE_IDLE;
@@ -121,6 +122,13 @@ void Warrior::SetCommand(CommandType cmd, Point2D location) {
 		return;
 	}
 
+	if (cmd == DEFEND && currentCommand != DEFEND) {
+		hasDefensePosition = false;
+	}
+
+	if (cmd == IDLE)
+		hasDefensePosition = false;
+
 	currentCommand = cmd;
 	targetLocation = location;
 	currentTargetEnemy = nullptr;
@@ -147,11 +155,11 @@ Soldier* Warrior::FindClosestVisibleEnemy(const std::vector<Soldier*>& all_soldi
 	return closest;
 }
 
-void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
+void Warrior::Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
 	if (!IsAlive()) return;
 
-	if (!is_commander_alive && currentCommand != IDLE) {
+	if (!commander || !commander->IsAlive()) {
 		currentCommand = IDLE;
 		targetLocation = { -1, -1 };
 	}
@@ -168,7 +176,12 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 	if (visibleEnemy) {
 		// Engage visible enemy immediately
 		currentTargetEnemy = visibleEnemy;
-		currentInternalState = STATE_ENGAGING;
+		if (currentCommand != DEFEND) {
+			currentInternalState = STATE_ENGAGING;
+		}
+		else {
+			currentInternalState = STATE_FINDING_COVER;
+		}
 	}
 	else {
 		// No visible enemy: act based on commander command
@@ -210,7 +223,7 @@ void Warrior::Update(bool is_commander_alive, const std::vector<Soldier*>& all_s
 		break;
 
 	case STATE_FINDING_COVER:
-		HandleFindingCover(map, securityMap);
+		HandleFindingCover(map, securityMap, all_soldiers, active_bullets);
 		break;
 
 	case STATE_IDLE:
@@ -324,12 +337,89 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 }
 
 
-void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
+void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ],
+	const std::vector<Soldier*>& all_soldiers,
+	std::vector<Bullet*>& active_bullets)
 {
-	// TODO: implement BFS or nearest safe spot
-	// For now, just patrol
-	//HandleScanning(map, securityMap);
+	this->bullet_ammo = W_NUM_BULLETS; // Reload when finding cover (optional)
+	printf("Warrior %p handling finding cover\n", this);
+	if (!commander || !commander->IsAlive()) return;
+
+	auto& reserved = commander->GetReservedDefendSpots();
+	Point2D myPos = getPosition();
+	Point2D threat = commander->getTargetLocation(); // Enemy centroid from commander
+
+	if (hasDefensePosition)
+	{
+		Soldier* visibleEnemy = FindClosestVisibleEnemy(all_soldiers);
+		if (visibleEnemy)
+		{
+			// Cover is no longer safe relocate
+			hasDefensePosition = false;
+			currentInternalState = STATE_FINDING_COVER;
+			path.clear();
+			return;
+		}
+	}
+
+	// If we do not yet have a designated defense spot, find one
+	if (!hasDefensePosition)
+	{
+		Point2D found = FindNearestCover(myPos, threat, reserved, map);
+
+		if (found.x != -1)
+		{
+			defensePosition = found;
+			reserved.push_back(found);  // Reserve the spot so no one else takes it
+			hasDefensePosition = true;
+
+			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
+			return;
+		}
+
+		// If no valid cover exists fallback: move away from the threat
+		if (threat.x != -1)
+		{
+			Point2D retreat = {
+				(int)(myPos.x + (myPos.x - threat.x)),
+				(int)(myPos.y + (myPos.y - threat.y))
+			};
+			SetTarget(retreat.x, retreat.y, map, securityMap);
+		}
+
+		return;
+	}
+
+	// Already have a defense position move there if not close enough yet
+	double dist = hypot(myPos.x - defensePosition.x, myPos.y - defensePosition.y);
+
+	if (dist > 1.5)
+	{
+		if (path.empty() || !isMoving)
+			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
+		return;
+	}
+
+	// In cover: hold position + defensive fire
+	currentInternalState = STATE_SCANNING_AREA;
+
+	// Defensive shooting
+	if (shoot_cooldown_timer == 0)
+	{
+		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
+		if (enemy)
+		{
+			Bullet* b = Shoot(enemy);
+			if (b)
+			{
+				b->setIsMoving(true);
+				active_bullets.push_back(b);
+			}
+			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES * 2; // slower fire rate while defending
+		}
+	}
 }
+
 
 Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]) {
 	// SAFETY CHECK: Verify target is valid

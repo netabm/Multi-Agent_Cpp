@@ -44,28 +44,6 @@ void Commander::Show()
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'C');
 }
 
-//void Commander::UpdateVisibility(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ])
-//{
-//	// 1. Reset the team's visibility map
-//	for (int i = 0; i < MSZ; i++) for (int j = 0; j < MSZ; j++) team_visibility[i][j] = false;
-//
-//	// 2. Loop through every soldier on the team
-//	for (Soldier* s : team_soldiers)
-//	{
-//		// 3. Calculate what this individual soldier can see
-//		CalculateVisibility(s, map, s->visibility);
-//
-//		// 4. Merge the soldier's view into the team's map
-//			for (int i = 0; i < MSZ; i++) {
-//				for (int j = 0; j < MSZ; j++) {
-//					if (s->visibility[i][j]) {
-//						team_visibility[i][j] = true;
-//					}
-//				}
-//			}
-//	}
-//}
-
 void Commander::CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
 	if (!isAlive) return;

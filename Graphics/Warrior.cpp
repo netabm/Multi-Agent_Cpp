@@ -251,7 +251,6 @@ void Warrior::HandleScanning(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 
 		if (patrol_target.x != -1) SetTarget(patrol_target.x, patrol_target.y, map, securityMap);
 	}
-	//Move(map);
 }
 
 void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
@@ -282,7 +281,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	// --- GRENADE THROWING LOGIC ---
 	const double MIN_GRENADE_DISTANCE = 8.0;
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
-	const double GRENADE_CHANCE = 0.008; // 48% chance (60 FPS * 0.008 = ~0.48 per second)
+	const double GRENADE_CHANCE = 0.005; // 30% chance (60 FPS * 0.005 = ~0.30 per second)
 
 	// THROW GRENADE
 	if (dist >= MIN_GRENADE_DISTANCE &&

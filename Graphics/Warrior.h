@@ -37,7 +37,10 @@ public:
 	Bullet* Shoot(Soldier* target);
 	Grenade* ThrowGrenade(Soldier* target);
 	int getAmmo() const { return bullet_ammo; };
-	void reloadAmmo() { bullet_ammo = W_NUM_BULLETS; };
+	void reloadAmmo() {
+		bullet_ammo = W_NUM_BULLETS;
+		grenade_ammo = W_NUM_GRENADES;
+	};
 	void heal() { health = 100; };
 	WarriorInternalState getCurrentInternalState() const { return currentInternalState; }
 

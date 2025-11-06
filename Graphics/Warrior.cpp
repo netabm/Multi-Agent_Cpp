@@ -122,17 +122,22 @@ void Warrior::SetCommand(CommandType cmd, Point2D location) {
 		return;
 	}
 
+	// Only reset cover when transitioning into DEFEND from another state
 	if (cmd == DEFEND && currentCommand != DEFEND) {
 		hasDefensePosition = false;
+		lastHealthInCover = -1;  // reset health in cover
 	}
 
-	if (cmd == IDLE)
+	// Leaving DEFEND
+	if (cmd != DEFEND) {
 		hasDefensePosition = false;
+		lastHealthInCover = -1;
+	}
+
 
 	currentCommand = cmd;
 	targetLocation = location;
 	currentTargetEnemy = nullptr;
-	//currentInternalState = (cmd == DEFEND) ? STATE_FINDING_COVER : STATE_MOVING;
 	path.clear();
 }
 
@@ -341,28 +346,30 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	const std::vector<Soldier*>& all_soldiers,
 	std::vector<Bullet*>& active_bullets)
 {
-	this->bullet_ammo = W_NUM_BULLETS; // Reload when finding cover (optional)
+	this->bullet_ammo = W_NUM_BULLETS; // Reload when finding cover
 	printf("Warrior %p handling finding cover\n", this);
 	if (!commander || !commander->IsAlive()) return;
 
 	auto& reserved = commander->GetReservedDefendSpots();
 	Point2D myPos = getPosition();
-	Point2D threat = commander->getTargetLocation(); // Enemy centroid from commander
+	Point2D threat = commander->getTargetLocation(); // enemy centroid from commander
 
-	if (hasDefensePosition)
+	// ------------------------------------------------------------------
+	// If we already have a defense position, check if we took damage
+	// while being in cover if yes, this cover is no longer safe.
+	// ------------------------------------------------------------------
+	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover)
 	{
-		Soldier* visibleEnemy = FindClosestVisibleEnemy(all_soldiers);
-		if (visibleEnemy)
-		{
-			// Cover is no longer safe relocate
-			hasDefensePosition = false;
-			currentInternalState = STATE_FINDING_COVER;
-			path.clear();
-			return;
-		}
+		// Cover compromised reset and find a new one
+		hasDefensePosition = false;
+		lastHealthInCover = -1;
+		path.clear();
+		currentInternalState = STATE_FINDING_COVER;
+		return;
 	}
+	// ------------------------------------------------------------------
 
-	// If we do not yet have a designated defense spot, find one
+	// If we do not yet have a designated defense spot find one
 	if (!hasDefensePosition)
 	{
 		Point2D found = FindNearestCover(myPos, threat, reserved, map);
@@ -370,14 +377,17 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 		if (found.x != -1)
 		{
 			defensePosition = found;
-			reserved.push_back(found);  // Reserve the spot so no one else takes it
+			reserved.push_back(found);
 			hasDefensePosition = true;
+
+			// Save health when entering cover
+			lastHealthInCover = health;
 
 			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
 			return;
 		}
 
-		// If no valid cover exists fallback: move away from the threat
+		// If no cover exists fallback movement away from threat
 		if (threat.x != -1)
 		{
 			Point2D retreat = {
@@ -386,11 +396,10 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 			};
 			SetTarget(retreat.x, retreat.y, map, securityMap);
 		}
-
 		return;
 	}
 
-	// Already have a defense position move there if not close enough yet
+	// Already has a defense position move to cover if not already there
 	double dist = hypot(myPos.x - defensePosition.x, myPos.y - defensePosition.y);
 
 	if (dist > 1.5)
@@ -400,8 +409,8 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 		return;
 	}
 
-	// In cover: hold position + defensive fire
-	currentInternalState = STATE_SCANNING_AREA;
+	// Update stored health while safely holding cover
+	lastHealthInCover = health;
 
 	// Defensive shooting
 	if (shoot_cooldown_timer == 0)
@@ -415,7 +424,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 				b->setIsMoving(true);
 				active_bullets.push_back(b);
 			}
-			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES * 2; // slower fire rate while defending
+			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES * 2;
 		}
 	}
 }

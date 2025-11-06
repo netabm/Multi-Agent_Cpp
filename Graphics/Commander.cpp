@@ -98,23 +98,32 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
 	targetLocation = { -1, -1 };
-
 	if (!isAlive) return;
 
 	CalculateTeamVisibility(team_soldiers, getTeam(), map, team_visibility);
 	CheckAmmo(team_soldiers, map, securityMap);
 	CheckHealth(team_soldiers, map, securityMap);
 
-	// Analyze team status
-	int aliveCount = 0;
-	int totalHealth = 0;
+	// Analyze WARRIOR health status (ignore support/commander)
+	int warriorCount = 0;
+	int totalWarriorHealth = 0;
+	int lowHealthWarriors = 0; // Warriors below 30 health
+	int criticalHealthWarriors = 0; // Warriors below 15 health
+
 	for (Soldier* s : team_soldiers) {
-		if (s->IsAlive()) {
-			aliveCount++;
-			totalHealth += s->getHealth();
+		Warrior* w = dynamic_cast<Warrior*>(s);
+		if (w && w->IsAlive()) {
+			warriorCount++;
+			int health = w->getHealth();
+			totalWarriorHealth += health;
+
+			if (health < 30) lowHealthWarriors++;
+			if (health < 15) criticalHealthWarriors++;
 		}
 	}
-	double avgHealth = aliveCount > 0 ? (double)totalHealth / aliveCount : 0.0;
+
+	double avgWarriorHealth = warriorCount > 0 ? (double)totalWarriorHealth / warriorCount : 100.0;
+	double lowHealthRatio = warriorCount > 0 ? (double)lowHealthWarriors / warriorCount : 0.0;
 
 	// Detect visible enemies
 	std::vector<Soldier*> visibleEnemies;
@@ -132,10 +141,16 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 	static Point2D previousTarget = { -1, -1 };
 
 	// Only give commands when enemies are visible
-	//printf("%s\n",enemyVisible ? "true" : "false");
 	if (enemyVisible) {
-		if (avgHealth < 60) {
-			//printf("Defend\n");
+		// DEFEND if any of these conditions are met:
+		// 1. More than 50% of warriors are low health (< 30)
+		// 2. Average warrior health below 40
+		// 3. Any warrior is critically wounded (< 15) - fall back to protect them
+		bool shouldDefend = (lowHealthRatio > 0.5) ||
+			(avgWarriorHealth < 40) ||
+			(criticalHealthWarriors > 0);
+
+		if (shouldDefend) {
 			currentCommand = DEFEND;
 		}
 		else {

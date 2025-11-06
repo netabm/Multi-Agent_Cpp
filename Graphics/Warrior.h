@@ -32,6 +32,7 @@ private:
 	int grenade_cooldown_timer = 0;
 	int grenade_decision_timer = 0;
 	int scan_timer = 0;
+	int lastHealthInCover = -1;
 	//bool isDefending = false;
 	bool hasDefensePosition = false;
 	Point2D defensePosition = { -1, -1 };

@@ -37,6 +37,11 @@ private:
 	bool hasDefensePosition = false;
 	Point2D defensePosition = { -1, -1 };
 
+	// New: cover-safety bookkeeping so warriors won't stay in cover forever
+	int cover_safe_timer = 0;
+	static const int COVER_SAFE_TIMEOUT_FRAMES = 600; // frames to wait before abandoning cover (no damage)
+	static const int COVER_HEALTH_RELEASE = 30;       // health threshold above which warrior will leave cover
+
 public:
 	Warrior(double start_x, double start_y, int team_id, Commander* cmd);
 

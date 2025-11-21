@@ -346,73 +346,18 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	const std::vector<Soldier*>& all_soldiers,
 	std::vector<Bullet*>& active_bullets)
 {
-	this->bullet_ammo = W_NUM_BULLETS; // Reload when finding cover
-	printf("Warrior %p handling finding cover\n", this);
+	// test
+	this->bullet_ammo = W_NUM_BULLETS;
+
 	if (!commander || !commander->IsAlive()) return;
 
-	auto& reserved = commander->GetReservedDefendSpots();
-	Point2D myPos = getPosition();
-	Point2D threat = commander->getTargetLocation(); // enemy centroid from commander
-
-	// ------------------------------------------------------------------
-	// If we already have a defense position, check if we took damage
-	// while being in cover if yes, this cover is no longer safe.
-	// ------------------------------------------------------------------
-	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover)
-	{
-		// Cover compromised reset and find a new one
+	if (health > 25) {
 		hasDefensePosition = false;
-		lastHealthInCover = -1;
 		path.clear();
-		currentInternalState = STATE_FINDING_COVER;
-		return;
-	}
-	// ------------------------------------------------------------------
-
-	// If we do not yet have a designated defense spot find one
-	if (!hasDefensePosition)
-	{
-		Point2D found = FindNearestCover(myPos, threat, reserved, map);
-
-		if (found.x != -1)
-		{
-			defensePosition = found;
-			reserved.push_back(found);
-			hasDefensePosition = true;
-
-			// Save health when entering cover
-			lastHealthInCover = health;
-
-			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
-			return;
-		}
-
-		// If no cover exists fallback movement away from threat
-		if (threat.x != -1)
-		{
-			Point2D retreat = {
-				(int)(myPos.x + (myPos.x - threat.x)),
-				(int)(myPos.y + (myPos.y - threat.y))
-			};
-			SetTarget(retreat.x, retreat.y, map, securityMap);
-		}
+		currentInternalState = STATE_SCANNING_AREA; // Resume normal behavior
 		return;
 	}
 
-	// Already has a defense position move to cover if not already there
-	double dist = hypot(myPos.x - defensePosition.x, myPos.y - defensePosition.y);
-
-	if (dist > 1.5)
-	{
-		if (path.empty() || !isMoving)
-			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
-		return;
-	}
-
-	// Update stored health while safely holding cover
-	lastHealthInCover = health;
-
-	// Defensive shooting
 	if (shoot_cooldown_timer == 0)
 	{
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
@@ -424,9 +369,79 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 				b->setIsMoving(true);
 				active_bullets.push_back(b);
 			}
+			// Shoot slower when in cover (defensive fire)
 			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES * 2;
 		}
 	}
+
+	auto& reserved = commander->GetReservedDefendSpots();
+	Point2D myPos = getPosition();
+	Point2D threat = commander->getTargetLocation(); // Enemy centroid from commander
+
+	// 2. Check if current cover is compromised
+	// If we are in a defense position but just took damage (health dropped),
+	// this cover is no longer safe.
+	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover)
+	{
+		hasDefensePosition = false;
+		lastHealthInCover = -1;
+		path.clear(); // Clear path to force finding a new spot immediately
+	}
+
+	// 3. Find a new spot if we don't have one
+	if (!hasDefensePosition)
+	{
+		Point2D found = FindNearestCover(myPos, threat, reserved, map);
+
+		if (found.x != -1)
+		{
+			defensePosition = found;
+			reserved.push_back(found); // Mark this spot as taken
+			hasDefensePosition = true;
+			lastHealthInCover = health;
+
+			// Start moving there
+			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
+			return;
+		}
+
+		// Fallback: If no cover object found (stones/walls), just retreat away from threat
+		if (threat.x != -1)
+		{
+			double dx = myPos.x - threat.x;
+			double dy = myPos.y - threat.y;
+			double len = sqrt(dx * dx + dy * dy);
+
+			// Move 5 units away from the threat vector
+			if (len > 0) {
+				int retreatX = (int)(myPos.x + (dx / len) * 5);
+				int retreatY = (int)(myPos.y + (dy / len) * 5);
+
+				// Clamp to map boundaries
+				if (retreatX < 0) retreatX = 0; if (retreatX >= MSZ) retreatX = MSZ - 1;
+				if (retreatY < 0) retreatY = 0; if (retreatY >= MSZ) retreatY = MSZ - 1;
+
+				if (path.empty() || !isMoving) {
+					SetTarget(retreatX, retreatY, map, securityMap);
+				}
+			}
+		}
+		return;
+	}
+
+	// 4. Move towards the chosen cover
+	double dist = hypot(myPos.x - defensePosition.x, myPos.y - defensePosition.y);
+
+	if (dist > 1.5)
+	{
+		// We aren't there yet, keep moving
+		if (path.empty() || !isMoving)
+			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
+		return;
+	}
+
+	// 5. We are IN POSITION (Holding the line)
+	lastHealthInCover = health; // Update health snapshot
 }
 
 

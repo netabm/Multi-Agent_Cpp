@@ -9,6 +9,8 @@ const int WARRIOR_SHOOT_COOLDOWN_FRAMES = 180;
 const int WARRIOR_GRENADE_COOLDOWN_FRAMES = 500;
 const int SCAN_TIMEOUT_FRAMES = 120;
 
+class Commander;
+
 enum WarriorInternalState {
 	STATE_IDLE,
 	STATE_MOVING,
@@ -18,6 +20,7 @@ enum WarriorInternalState {
 };
 
 class Warrior : public Soldier {
+	Commander* commander;
 private:
 	int bullet_ammo;
 	int grenade_ammo;
@@ -29,8 +32,18 @@ private:
 	int grenade_cooldown_timer = 0;
 	int grenade_decision_timer = 0;
 	int scan_timer = 0;
+	int lastHealthInCover = -1;
+	//bool isDefending = false;
+	bool hasDefensePosition = false;
+	Point2D defensePosition = { -1, -1 };
+
+	// New: cover-safety bookkeeping so warriors won't stay in cover forever
+	int cover_safe_timer = 0;
+	static const int COVER_SAFE_TIMEOUT_FRAMES = 600; // frames to wait before abandoning cover (no damage)
+	static const int COVER_HEALTH_RELEASE = 30;       // health threshold above which warrior will leave cover
+
 public:
-	Warrior(double start_x, double start_y, int team_id);
+	Warrior(double start_x, double start_y, int team_id, Commander* cmd);
 
 	void Show();
 
@@ -45,16 +58,19 @@ public:
 	WarriorInternalState getCurrentInternalState() const { return currentInternalState; }
 
 
-	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]);
+	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
 	Soldier* FindClosestVisibleEnemy(const std::vector<Soldier*>& all_soldiers);
+	bool CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ]);
+	bool IsCellOccupied(int x, int y, const std::vector<Soldier*>& all_soldiers);
+
 
 	void SetCommand(CommandType cmd, Point2D location);
-	// Fixed signature: accept the real grenades vector type
-	void Update(bool is_commander_alive, const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+
+	void Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 
 	void HandleMoving(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 	void HandleScanning(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 	void HandleEngaging(std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
-	void HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+	void HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets);
 
 };

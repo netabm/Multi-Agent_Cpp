@@ -69,3 +69,75 @@ std::vector<Point2D> AStar(Point2D start, Point2D target, int map[MSZ][MSZ], dou
     for (auto& node : all_nodes) delete node;
     return final_path;
 }
+
+Point2D FindNearestCover(Point2D start, Point2D threat, const std::vector<Point2D>& avoid_spots, int map[MSZ][MSZ])
+{
+    const int MAX_SEARCH_RANGE = 20; // Define search range (20 cells)
+    const double MIN_FRIENDLY_DISTANCE_SQ = 3.0 * 3.0; // Use squared distance for efficiency
+
+    std::queue<std::pair<Point2D, int>> q; // Queue for {Point, distance}
+    bool visited[MSZ][MSZ] = { false };
+
+    q.push({ start, 0 });
+    visited[start.y][start.x] = true;
+
+    int dx[] = { 0, 0, 1, -1, 1, 1, -1, -1 };
+    int dy[] = { 1, -1, 0, 0, 1, -1, 1, -1 };
+
+    while (!q.empty())
+    {
+        Point2D currentPos = q.front().first;
+        int currentDist = q.front().second;
+        q.pop();
+
+        // We can't take cover in our own spot. We must move.
+        if (currentDist > 0)
+        {
+            // 1. Check if spot has cover from threat
+            if (!HasLineOfSight(currentPos.x, currentPos.y, threat.x, threat.y, map))
+            {
+                // 2. This spot has cover. NOW, check if it's too close to an "avoid" spot.
+                bool tooCloseToAvoid = false;
+                for (const Point2D& spot : avoid_spots) {
+                    // Don't check distance to ourself (the start pos)
+                    if (spot.x == start.x && spot.y == start.y) continue;
+
+                    double distSq = pow(currentPos.x - spot.x, 2) + pow(currentPos.y - spot.y, 2);
+                    if (distSq < MIN_FRIENDLY_DISTANCE_SQ) {
+                        tooCloseToAvoid = true;
+                        break;
+                    }
+                }
+
+                // If it's NOT too close, it's our spot!
+                if (!tooCloseToAvoid) {
+                    return currentPos; // This is the NEAREST, SOCIALLY-DISTANCED cover.
+                }
+                // If it was too close, we don't return. The BFS continues.
+            }
+        }
+
+        // 3. If not safe, or too close, or start tile:
+        // Check if we are still within search range
+        if (currentDist < MAX_SEARCH_RANGE)
+        {
+            // Add neighbors to the queue
+            for (int i = 0; i < 8; i++) // Check all 8 directions
+            {
+                int nx = currentPos.x + dx[i];
+                int ny = currentPos.y + dy[i];
+
+                if (nx >= 0 && nx < MSZ && ny >= 0 && ny < MSZ &&
+                    !visited[ny][nx] &&
+                    (map[ny][nx] != STONE && map[ny][nx] != WATER))
+                {
+                    visited[ny][nx] = true;
+                    q.push({ {nx, ny}, currentDist + 1 });
+                }
+            }
+        }
+    }
+
+    // No cover found within range
+    return { -1, -1 };
+}

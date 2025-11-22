@@ -215,16 +215,18 @@ void init()
 	soldiers.push_back(new Commander(6, 6, 0));
 	c0 = dynamic_cast<Commander*>(soldiers.back());
 
-	soldiers.push_back(new Warrior(4, 8, 0));
-	soldiers.push_back(new Warrior(8, 4, 0));
+	soldiers.push_back(new Warrior(4, 8, 0, c0));
+	soldiers.push_back(new Warrior(8, 4, 0, c0));
 	soldiers.push_back(new SupplySoldier(12, 6, 0));
 	soldiers.push_back(new Medic(6, 12, 0));
 
 	// Team 1 (top-right region) - spread out
 	soldiers.push_back(new Commander(43, 43, 1));
 	c1 = dynamic_cast<Commander*>(soldiers.back());
-	soldiers.push_back(new Warrior(41, 45, 1));
-	soldiers.push_back(new Warrior(45, 41, 1));
+	soldiers.push_back(new Warrior(41, 45, 1, c1));
+	soldiers.push_back(new Warrior(45, 41, 1, c1));
+	soldiers.push_back(new SupplySoldier(44, 38, 1));
+	soldiers.push_back(new Medic(38, 44, 1));
 }
 
 void CreateSecurityMap()
@@ -535,13 +537,7 @@ void idle()
 	for (Soldier* s : soldiers) {
 		Warrior* w = dynamic_cast<Warrior*>(s);
 		if (w && w->IsAlive()) {
-			// is commander alive for this team?
-			bool commanderAlive = false;
-			for (Soldier* t : soldiers) {
-				Commander* c = dynamic_cast<Commander*>(t);
-				if (c && c->getTeam() == w->getTeam() && c->IsAlive()) { commanderAlive = true; break; }
-			}
-			w->Update(commanderAlive, soldiers, active_bullets, active_grenades, map, securityMap);
+			w->Update(soldiers, active_bullets, active_grenades, map, securityMap);
 		}
 		else if (SupportSoldier* sp = dynamic_cast<SupportSoldier*>(s)) {
 			sp->Update(map, securityMap);
@@ -565,7 +561,6 @@ void idle()
 	for (Bullet* bullet : active_bullets) {
 		if (bullet->getIsMoving()) {
 			bullet->UpdateSecurityMap(map, securityMap);
-			//printf("bullet is here\n");
 			for (Soldier* soldier : soldiers) {
 				if (soldier != bullet->getShooter() && soldier->IsAlive()) {
 					double soldier_posX = soldier->getX();
@@ -587,7 +582,6 @@ void idle()
 	for (Grenade* grenade : active_grenades) {
 		Bullet** bullets_from_grenade = grenade->getBullets();
 		for (int i = 0; i < NUM_BULLETS; i++) {
-			// *** THIS IS THE FIX ***
 			// Must check if the bullet pointer is valid *before* trying to use it.
 			if (bullets_from_grenade[i] && bullets_from_grenade[i]->getIsMoving()) {
 				bullets_from_grenade[i]->UpdateSecurityMap(map, securityMap);

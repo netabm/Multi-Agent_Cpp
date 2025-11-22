@@ -4,7 +4,8 @@
 enum SupportState {
     SUPPORT_IDLE,
     SUPPORT_MOVING_TO_WAREHOUSE,
-    SUPPORT_MOVING_TO_WARRIOR
+    SUPPORT_MOVING_TO_WARRIOR,
+    SUPPORT_RETURNING_HOME
 };
 
 class SupportSoldier : public Soldier {
@@ -25,4 +26,7 @@ public:
     virtual void Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 
     SupportState getSupportState() const { return current_support_state;}
+
+    void ReturnToWarehouse();
+
 };

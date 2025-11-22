@@ -42,7 +42,7 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
 
     switch (current_support_state) {
     case SUPPORT_MOVING_TO_WAREHOUSE:
-        // FIX 2: Check if already at warehouse FIRST
+        // Check if already at warehouse FIRST
         if (isNear(warehouse)) {
             // Already at warehouse, proceed to next state
             current_support_state = SUPPORT_MOVING_TO_WARRIOR;
@@ -96,6 +96,30 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
         // else: currently moving toward warrior, let Move() handle it
         break;
 
+    case SUPPORT_RETURNING_HOME:
+    {
+        Point2D home = GetWarehousePosition();
+
+        // If already there, stay idle
+        if (isNear(home)) {
+            current_support_state = SUPPORT_IDLE;
+            path.clear();
+            isMoving = false;
+            break;
+        }
+
+        // Start moving if no path
+        if (!isMoving && path.empty()) {
+            SetTarget(home.x, home.y, map, securityMap);
+
+            if (!isMoving) {
+                // Can't reach home, just idle
+                current_support_state = SUPPORT_IDLE;
+            }
+        }
+    }
+    break;
+
     default:
         // Invalid state, reset
         current_support_state = SUPPORT_IDLE;
@@ -104,4 +128,14 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
         path.clear();
         break;
     }
+}
+
+void SupportSoldier::ReturnToWarehouse()
+{
+    if (!IsAlive()) return;
+
+    current_support_state = SUPPORT_RETURNING_HOME;
+    target_warrior = nullptr;   // no warrior involved
+    path.clear();
+    isMoving = false;
 }

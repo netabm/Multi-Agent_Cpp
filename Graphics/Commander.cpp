@@ -69,6 +69,18 @@ void Commander::CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MS
 			return; // only assign one warrior per frame
 		}
 	}
+
+	// If no one needs ammo, send idle supply soldier back to warehouse
+	for (Soldier* s : team_soldiers)
+	{
+		SupplySoldier* sup = dynamic_cast<SupplySoldier*>(s);
+		if (sup && sup->IsAlive() && sup->getSupportState() == SUPPORT_IDLE)
+		{
+			sup->ReturnToWarehouse();
+		}
+	}
+
+
 }
 
 void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
@@ -76,6 +88,7 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 {
 	if (!isAlive) return;
 
+	// Find an idle medic
 	Medic* availableMedic = nullptr;
 	for (Soldier* s : team_soldiers) {
 		Medic* m = dynamic_cast<Medic*>(s);
@@ -86,35 +99,91 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 	}
 	if (!availableMedic) return;
 
-	for (Soldier* s : team_soldiers) {
+	Warrior* bestLowHP = nullptr;
+	Warrior* bestCoverNeed = nullptr;
+
+	// Scan for warriors who need healing
+	for (Soldier* s : team_soldiers)
+	{
 		Warrior* w = dynamic_cast<Warrior*>(s);
-		if (w && w->IsAlive() && w->getHealth() < 25) {
-			availableMedic->AssignSupportTask(w);
-			return;
+		if (!w || !w->IsAlive()) continue;
+
+		int hp = w->getHealth();
+		int state = w->getCurrentInternalState();
+
+		// Priority 1: lowest HP warrior <= 25
+		if (hp <= 25) {
+			if (!bestLowHP || hp < bestLowHP->getHealth())
+				bestLowHP = w;
+		}
+
+		// Priority 2: warrior finding cover (pick the lowest HP among them)
+		if (state == STATE_FINDING_COVER) {
+			if (!bestCoverNeed || hp < bestCoverNeed->getHealth())
+				bestCoverNeed = w;
 		}
 	}
+
+	// Assign task by priority
+	if (bestLowHP) {
+		availableMedic->AssignSupportTask(bestLowHP);
+		return;
+	}
+
+	if (bestCoverNeed) {
+		availableMedic->AssignSupportTask(bestCoverNeed);
+		return;
+	}
+
+	// If no one needs healing, send idle medic back to warehouse
+	for (Soldier* s : team_soldiers)
+	{
+		Medic* m = dynamic_cast<Medic*>(s);
+		if (m && m->IsAlive() && m->getSupportState() == SUPPORT_IDLE)
+		{
+			m->ReturnToWarehouse();
+		}
+	}
+
 }
+
 
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
+	attack_reserved_spots.clear();
 	targetLocation = { -1, -1 };
-
 	if (!isAlive) return;
 
 	CalculateTeamVisibility(team_soldiers, getTeam(), map, team_visibility);
 	CheckAmmo(team_soldiers, map, securityMap);
 	CheckHealth(team_soldiers, map, securityMap);
 
-	// Analyze team status
-	int aliveCount = 0;
-	int totalHealth = 0;
+	// Check if we have a medic
+	bool medicAvailable = false;
 	for (Soldier* s : team_soldiers) {
-		if (s->IsAlive()) {
-			aliveCount++;
-			totalHealth += s->getHealth();
+		Medic* m = dynamic_cast<Medic*>(s);
+		if (m && m->IsAlive()) {
+			medicAvailable = true;
+			break;
 		}
 	}
-	double avgHealth = aliveCount > 0 ? (double)totalHealth / aliveCount : 0.0;
+
+	// Analyze Health
+	int warriorCount = 0;
+	int totalWarriorHealth = 0;
+	int criticalHealthWarriors = 0;
+
+	for (Soldier* s : team_soldiers) {
+		Warrior* w = dynamic_cast<Warrior*>(s);
+		if (w && w->IsAlive()) {
+			warriorCount++;
+			int health = w->getHealth();
+			totalWarriorHealth += health;
+
+			if (health <= 25) criticalHealthWarriors++;
+		}
+	}
+	double avgWarriorHealth = warriorCount > 0 ? (double)totalWarriorHealth / warriorCount : 0.0;
 
 	// Detect visible enemies
 	std::vector<Soldier*> visibleEnemies;
@@ -128,20 +197,25 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 	}
 	bool enemyVisible = !visibleEnemies.empty();
 
-	static CommandType previousCommand = IDLE;
-	static Point2D previousTarget = { -1, -1 };
+	CommandType previousCommand = IDLE;
+	Point2D previousTarget = { -1, -1 };
 
-	// Only give commands when enemies are visible
 	if (enemyVisible) {
-		if (avgHealth < 40) {
+		// Only defend if we have a Medic and the team is actually hurt
+		bool shouldDefend = false;
+
+		if (medicAvailable) {
+			shouldDefend = (avgWarriorHealth < 40) || (criticalHealthWarriors > 0);
+		}
+
+		if (shouldDefend) {
 			currentCommand = DEFEND;
-			// Calculate safe position if needed
 		}
 		else {
 			currentCommand = ATTACK;
 		}
 
-		// Calculate target location (enemy centroid)
+		// Calculate Enemy Center
 		double avgX = 0, avgY = 0;
 		for (Soldier* e : visibleEnemies) {
 			avgX += e->getX();
@@ -151,15 +225,29 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 		avgY /= visibleEnemies.size();
 		targetLocation = { (int)avgX, (int)avgY };
 
-		// Only broadcast the command if it changed (reduces SetCommand spam)
-		if (currentCommand != previousCommand || !(previousTarget == targetLocation)) {
+		// Broadcast with Spam Protection
+		// Check if command changed OR if target moved significantly (prevent jitter)
+		bool commandChanged = (currentCommand != previousCommand);
+		bool targetMoved = (abs(previousTarget.x - targetLocation.x) > 2 || abs(previousTarget.y - targetLocation.y) > 2);
+
+		if (commandChanged || targetMoved) {
 			for (Soldier* s : team_soldiers) {
 				if (!s->IsAlive()) continue;
 				Warrior* w = dynamic_cast<Warrior*>(s);
 				if (!w) continue;
 
 				auto state = w->getCurrentInternalState();
-				if (state == STATE_IDLE || state == STATE_SCANNING_AREA) {
+
+				// Case A: We are fighting, but need to retreat
+				if (state == STATE_ENGAGING && currentCommand == DEFEND) {
+					w->SetCommand(currentCommand, targetLocation);
+				}
+				// Case B: We are doing nothing, so take orders
+				else if (state == STATE_IDLE || state == STATE_SCANNING_AREA) {
+					w->SetCommand(currentCommand, targetLocation);
+				}
+				// Case C: We are hiding, but the Commander says attack
+				else if (state == STATE_FINDING_COVER && currentCommand == ATTACK) {
 					w->SetCommand(currentCommand, targetLocation);
 				}
 			}
@@ -168,19 +256,16 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 		}
 	}
 	else {
-		// No enemies visible: clear outstanding commands so warriors revert to autonomous patrol
-		if (previousCommand != IDLE || !(previousTarget == Point2D{ -1, -1 })) {
+		// No enemies visible
+		if (previousCommand != IDLE) {
 			currentCommand = IDLE;
+			defend_reserved_spots.clear();
 			targetLocation = { -1, -1 };
 			for (Soldier* s : team_soldiers) {
-				if (!s->IsAlive()) continue;
 				Warrior* w = dynamic_cast<Warrior*>(s);
-				if (!w) continue;
-
-				w->SetCommand(IDLE, targetLocation);
+				if (w && w->IsAlive()) w->SetCommand(IDLE, targetLocation);
 			}
 			previousCommand = IDLE;
-			previousTarget = targetLocation;
 		}
 	}
 }

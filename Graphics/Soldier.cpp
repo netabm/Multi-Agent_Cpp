@@ -1,4 +1,5 @@
 #include "Soldier.h"
+#include <string>
 #include "glut.h"
 
 Soldier::Soldier(double start_x, double start_y, int team_id) {
@@ -20,34 +21,50 @@ Soldier::Soldier(double start_x, double start_y, int team_id) {
 void Soldier::Show() {
 	if (!isAlive) return;
 
+	// --- Draw Soldier ---
+	glColor3d(0.2, 0.2, 0.8); // Example soldier color
+	glBegin(GL_POLYGON);
+	glVertex2d(x, y);
+	glVertex2d(x + 1.0, y);
+	glVertex2d(x + 1.0, y + 1.0);
+	glVertex2d(x, y + 1.0);
+	glEnd();
+
 	// --- Draw Health Bar ---
 	double healthPercentage = (double)health / 100.0; // Assuming max health is 100
 	if (healthPercentage < 0) healthPercentage = 0;
 
-	// Bar position (slightly above the soldier's square)
-	double barY = y + 1.1; // Adjust Y offset as needed
-	double barHeight = 0.15; // Adjust height as needed
-	double barWidth = 1.0;   // Same width as the soldier square
+	double barY = y + 1.2;       // Slightly above the soldier
+	double barHeight = 0.15;
+	double barWidth = 1.0;       // Same width as soldier square
 
-	// Draw background (e.g., dark red)
+	// Background (dark red)
 	glColor3d(0.5, 0.1, 0.1);
-	glBegin(GL_POLYGON); // Use GL_RECTANGLE for simple filled rect
-	glVertex2d(x, barY);
+	glBegin(GL_POLYGON);
+	glVertex2d(x , barY);
 	glVertex2d(x + barWidth, barY);
 	glVertex2d(x + barWidth, barY + barHeight);
 	glVertex2d(x, barY + barHeight);
 	glEnd();
 
-	// Draw foreground (e.g., green) based on health percentage
+	// Foreground (green) proportional to health
 	glColor3d(0.1, 0.8, 0.1);
 	glBegin(GL_POLYGON);
 	glVertex2d(x, barY);
-	glVertex2d(x + (barWidth * healthPercentage), barY); // Width depends on health
+	glVertex2d(x + (barWidth * healthPercentage), barY);
 	glVertex2d(x + (barWidth * healthPercentage), barY + barHeight);
 	glVertex2d(x, barY + barHeight);
 	glEnd();
-	// ----------------------
+
+	// --- Draw Numerical Health ---
+	glColor3d(0, 0, 0); // Black text
+	std::string healthText = std::to_string(health);
+	glRasterPos2d(x, barY + barHeight + 0.1); // Slightly above the bar
+	for (char c : healthText) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c);
+	}
 }
+
 
 void Soldier::SetTarget(int target_x, int target_y, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
 	Point2D start = { (int)x, (int)y };

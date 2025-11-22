@@ -11,7 +11,7 @@ const int WATER = 3;
 const int AMMO_WAREHOUSE = 4;
 const int MEDICAL_WAREHOUSE = 5;
 const double SPEED = 0.02;
-const int DAMAGE = 5;
+const int DAMAGE = 3;
 
 const double WARRIOR_FIRING_RANGE = 7.0;
 const double GRENADE_THROW_RANGE = 15.0;

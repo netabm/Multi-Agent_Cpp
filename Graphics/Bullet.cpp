@@ -35,7 +35,7 @@ void Bullet::Move(int map[MSZ][MSZ])
 			if (tmpX >= 0 && tmpX < MSZ && tmpY >= 0 && tmpY < MSZ && map[(int)tmpY][(int)tmpX] != STONE && map[(int)tmpY][(int)tmpX] != TREE)
 			{
 				x = tmpX;
-				y = tmpY;
+				y = tmpY;	
 			}
 			else isMoving = false;
 		}

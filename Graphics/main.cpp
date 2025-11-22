@@ -561,7 +561,6 @@ void idle()
 	for (Bullet* bullet : active_bullets) {
 		if (bullet->getIsMoving()) {
 			bullet->UpdateSecurityMap(map, securityMap);
-			//printf("bullet is here\n");
 			for (Soldier* soldier : soldiers) {
 				if (soldier != bullet->getShooter() && soldier->IsAlive()) {
 					double soldier_posX = soldier->getX();

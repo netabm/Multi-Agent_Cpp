@@ -76,6 +76,7 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 {
 	if (!isAlive) return;
 
+	// Find an idle medic
 	Medic* availableMedic = nullptr;
 	for (Soldier* s : team_soldiers) {
 		Medic* m = dynamic_cast<Medic*>(s);
@@ -86,14 +87,43 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 	}
 	if (!availableMedic) return;
 
-	for (Soldier* s : team_soldiers) {
+	Warrior* bestLowHP = nullptr;
+	Warrior* bestCoverNeed = nullptr;
+
+	// Scan for warriors who need healing
+	for (Soldier* s : team_soldiers)
+	{
 		Warrior* w = dynamic_cast<Warrior*>(s);
-		if (w && w->IsAlive() && w->getHealth() <= 25) {
-			availableMedic->AssignSupportTask(w);
-			return;
+		if (!w || !w->IsAlive()) continue;
+
+		int hp = w->getHealth();
+		int state = w->getCurrentInternalState();
+
+		// Priority 1: lowest HP warrior <= 25
+		if (hp <= 25) {
+			if (!bestLowHP || hp < bestLowHP->getHealth())
+				bestLowHP = w;
+		}
+
+		// Priority 2: warrior finding cover (pick the lowest HP among them)
+		if (state == STATE_FINDING_COVER) {
+			if (!bestCoverNeed || hp < bestCoverNeed->getHealth())
+				bestCoverNeed = w;
 		}
 	}
+
+	// Assign task by priority
+	if (bestLowHP) {
+		availableMedic->AssignSupportTask(bestLowHP);
+		return;
+	}
+
+	if (bestCoverNeed) {
+		availableMedic->AssignSupportTask(bestCoverNeed);
+		return;
+	}
 }
+
 
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {

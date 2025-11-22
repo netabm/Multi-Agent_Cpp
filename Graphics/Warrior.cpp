@@ -285,6 +285,8 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	}
 
 	Point2D tgtPos = currentTargetEnemy->getPosition();
+
+	// 1. General Visibility Check (Can we see them at all?)
 	if (!visibility[tgtPos.y][tgtPos.x]) {
 		currentTargetEnemy = nullptr;
 		currentInternalState = STATE_SCANNING_AREA;
@@ -296,47 +298,59 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	double dy = tgtPos.y + 0.5 - y;
 	double dist = hypot(dx, dy);
 
-	// --- GRENADE THROWING LOGIC ---
+	// --- GRENADE LOGIC ---
 	const double MIN_GRENADE_DISTANCE = 8.0;
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
-	const double GRENADE_CHANCE = 0.005; // 30% chance (60 FPS * 0.005 = ~0.30 per second)
+	const double GRENADE_CHANCE = 0.005;
 
-	// THROW GRENADE
 	if (dist >= MIN_GRENADE_DISTANCE &&
 		dist <= MAX_GRENADE_DISTANCE &&
 		grenade_ammo > 0 &&
 		grenade_cooldown_timer == 0 &&
 		((double)rand() / RAND_MAX) < GRENADE_CHANCE)
 	{
-		// ThrowGrenade() handles ammo decrement and creating the grenade
 		Grenade* g = ThrowGrenade(currentTargetEnemy);
 		if (g) {
 			active_grenades.push_back(g);
 			grenade_cooldown_timer = WARRIOR_GRENADE_COOLDOWN_FRAMES;
 		}
-		// Threw a grenade, so stop moving and wait
 		path.clear();
 		isMoving = false;
-	}
-	else if (dist > WARRIOR_FIRING_RANGE)
-	{
-		// Out of range, move
-		Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map);
-		if (path.empty() || !isMoving) {
-			SetTarget(attackPos.x, attackPos.y, map, securityMap);
-		}
 	}
 	else
 	{
-		path.clear();
-		isMoving = false;
-		if (shoot_cooldown_timer == 0) {
-			Bullet* b = Shoot(currentTargetEnemy);
-			if (b) {
-				b->setIsMoving(true);
-				active_bullets.push_back(b);
+		// --- SHOOTING LOGIC ---
+		bool inRange = (dist <= WARRIOR_FIRING_RANGE);
+
+		// USE THE NEW HELPER HERE
+		// We pass (x + 0.5) to check from the CENTER of the warrior to CENTER of enemy
+		bool clearShot = CheckFirePath(x + 0.5, y + 0.5, tgtPos.x + 0.5, tgtPos.y + 0.5, map);
+
+		if (inRange && clearShot)
+		{
+			// We have a valid shot. Stop and fire.
+			path.clear();
+			isMoving = false;
+			if (shoot_cooldown_timer == 0) {
+				Bullet* b = Shoot(currentTargetEnemy);
+				if (b) {
+					b->setIsMoving(true);
+					active_bullets.push_back(b);
+				}
+				shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
 			}
-			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
+		}
+		else
+		{
+			// Either we are too far away, OR THERE IS A TREE IN THE WAY.
+			// We must move.
+
+			Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map);
+
+			// Move if we aren't already moving
+			if (path.empty() || !isMoving) {
+				SetTarget(attackPos.x, attackPos.y, map, securityMap);
+			}
 		}
 	}
 }
@@ -444,50 +458,111 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	lastHealthInCover = health; // Update health snapshot
 }
 
-
 Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]) {
-	// SAFETY CHECK: Verify target is valid
-	if (!target || !target->IsAlive()) {
-		return getPosition(); // Return current position if invalid
-	}
+	if (!target || !target->IsAlive()) return getPosition();
 
 	Point2D targetPos = target->getPosition();
-
-	// SAFETY CHECK: Verify position is valid
-	if (targetPos.x < 0 || targetPos.x >= MSZ || targetPos.y < 0 || targetPos.y >= MSZ) {
-		return getPosition();
-	}
-
 	Point2D currentPos = getPosition();
-	Point2D bestPos = { -1, -1 };
+
+	// Plan A: Find the best shooting spot (Clear shot + Safe distance)
+	Point2D bestShootingPos = { -1, -1 };
 	double minDistSqToWarrior = 1e9;
 
-	int radius = (int)WARRIOR_FIRING_RANGE;
+	// Plan B: Find the closest valid spot to the enemy (Chase mode)
+	// We use this if we can't find a shooting spot.
+	Point2D bestChasePos = { -1, -1 };
+	double minChaseDistSq = 1e9;
 
-	for (int dx = -radius; dx <= radius; ++dx) {
-		for (int dy = -radius; dy <= radius; ++dy) {
-			int x = targetPos.x + dx;
-			int y = targetPos.y + dy;
+	int searchRadius = (int)WARRIOR_FIRING_RANGE;
 
-			if (x < 0 || x >= MSZ || y < 0 || y >= MSZ) continue;
-			if (map[y][x] == STONE || map[y][x] == WATER) continue;
+	// Optimization: Don't check huge area every frame. 
+	// A radius of 5-8 is usually enough to find a local side-step.
+	int limit = 8;
 
-			double distSqToTarget = dx * dx + dy * dy;
-			if (distSqToTarget > WARRIOR_FIRING_RANGE * WARRIOR_FIRING_RANGE) continue;
-			if (!HasLineOfSight(x, y, targetPos.x, targetPos.y, map)) continue;
+	for (int dx = -limit; dx <= limit; ++dx) {
+		for (int dy = -limit; dy <= limit; ++dy) {
+			int xCandidate = currentPos.x + dx; // Look relative to ME, not the enemy (find local moves)
+			int yCandidate = currentPos.y + dy;
 
-			double distSqToWarrior = pow(x - currentPos.x, 2) + pow(y - currentPos.y, 2);
-			if (distSqToWarrior < minDistSqToWarrior) {
-				minDistSqToWarrior = distSqToWarrior;
-				bestPos = { x, y };
+			// Bounds check
+			if (xCandidate < 0 || xCandidate >= MSZ || yCandidate < 0 || yCandidate >= MSZ) continue;
+
+			// Obstacle check
+			if (map[yCandidate][xCandidate] == STONE || map[yCandidate][xCandidate] == WATER || map[yCandidate][xCandidate] == TREE) continue;
+
+			// Calc distance to target from this candidate spot
+			double distSqToTarget = pow(xCandidate - targetPos.x, 2) + pow(yCandidate - targetPos.y, 2);
+
+			// Update Plan B (Chase) - strictly based on being closer to enemy
+			if (distSqToTarget < minChaseDistSq) {
+				minChaseDistSq = distSqToTarget;
+				bestChasePos = { xCandidate, yCandidate };
+			}
+
+			// Check Plan A (Shooting Spot)
+			// 1. Must be in range
+			if (distSqToTarget <= WARRIOR_FIRING_RANGE * WARRIOR_FIRING_RANGE) {
+				// 2. Must have clear shot (Use the precise check!)
+				if (CheckFirePath(xCandidate + 0.5, yCandidate + 0.5, targetPos.x + 0.5, targetPos.y + 0.5, map)) {
+
+					// We found a valid shooting spot!
+					// We prefer spots that are closer to our CURRENT location (less walking)
+					double distSqToMe = dx * dx + dy * dy;
+					if (distSqToMe < minDistSqToWarrior) {
+						minDistSqToWarrior = distSqToMe;
+						bestShootingPos = { xCandidate, yCandidate };
+					}
+				}
 			}
 		}
 	}
 
-	if (bestPos.x == -1) {
-		// fallback: return current position (don't chase invalid target)
-		return currentPos;
+	// 1. If we found a valid spot to shoot from, go there.
+	if (bestShootingPos.x != -1) {
+		return bestShootingPos;
 	}
 
-	return bestPos;
+	// 2. If NO shooting spot found (e.g., dense forest), just Chase the enemy.
+	if (bestChasePos.x != -1) {
+		return bestChasePos;
+	}
+
+	// 3. Total failure (shouldn't happen unless boxed in), stay put.
+	return currentPos;
+}
+
+// Add this to the top of Warrior.cpp
+bool Warrior::CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ])
+{
+	double dx = targetX - startX;
+	double dy = targetY - startY;
+	double dist = sqrt(dx * dx + dy * dy);
+
+	if (dist < 1.0) return true; // Too close to miss
+
+	double dirX = dx / dist;
+	double dirY = dy / dist;
+
+	double currX = startX;
+	double currY = startY;
+
+	// Step size 0.1: Very precise to match bullet physics
+	// Stop 0.5 units before target to avoid checking the enemy's own cell as a wall
+	for (double d = 0; d < dist - 0.5; d += 0.1)
+	{
+		currX += dirX * 0.1;
+		currY += dirY * 0.1;
+
+		int gridX = (int)currX;
+		int gridY = (int)currY;
+
+		if (gridX >= 0 && gridX < MSZ && gridY >= 0 && gridY < MSZ)
+		{
+			if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE)
+			{
+				return false; // Blocked
+			}
+		}
+	}
+	return true;
 }

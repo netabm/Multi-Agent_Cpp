@@ -104,7 +104,7 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 	CheckAmmo(team_soldiers, map, securityMap);
 	CheckHealth(team_soldiers, map, securityMap);
 
-	// --- 1. Check if we even HAVE a Medic ---
+	// Check if we have a medic
 	bool medicAvailable = false;
 	for (Soldier* s : team_soldiers) {
 		Medic* m = dynamic_cast<Medic*>(s);
@@ -114,10 +114,9 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 		}
 	}
 
-	// --- 2. Analyze Health ---
+	// Analyze Health
 	int warriorCount = 0;
 	int totalWarriorHealth = 0;
-	int lowHealthWarriors = 0;
 	int criticalHealthWarriors = 0;
 
 	for (Soldier* s : team_soldiers) {
@@ -127,15 +126,10 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 			int health = w->getHealth();
 			totalWarriorHealth += health;
 
-			// LOGIC CHANGE: Align with Medic's rule (<= 25).
-			// If we retreat at 30, but Medic only heals at 25, we get stuck.
-			if (health <= 25) lowHealthWarriors++;
-			if (health < 15) criticalHealthWarriors++;
+			if (health <= 25) criticalHealthWarriors++;
 		}
 	}
-
-	double avgWarriorHealth = warriorCount > 0 ? (double)totalWarriorHealth / warriorCount : 100.0;
-	double lowHealthRatio = warriorCount > 0 ? (double)lowHealthWarriors / warriorCount : 0.0;
+	double avgWarriorHealth = warriorCount > 0 ? (double)totalWarriorHealth / warriorCount : 0.0;
 
 	// Detect visible enemies
 	std::vector<Soldier*> visibleEnemies;
@@ -149,19 +143,15 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 	}
 	bool enemyVisible = !visibleEnemies.empty();
 
-	static CommandType previousCommand = IDLE;
-	static Point2D previousTarget = { -1, -1 };
+	CommandType previousCommand = IDLE;
+	Point2D previousTarget = { -1, -1 };
 
 	if (enemyVisible) {
-
-		// --- 3. Defense Logic ---
-		// Only DEFEND if we have a Medic AND the team is actually hurt.
+		// Only defend if we have a Medic and the team is actually hurt
 		bool shouldDefend = false;
 
 		if (medicAvailable) {
-			shouldDefend = (lowHealthRatio > 0.5) ||
-				(avgWarriorHealth < 40) ||
-				(criticalHealthWarriors > 0);
+			shouldDefend = (avgWarriorHealth < 40) || (criticalHealthWarriors > 0);
 		}
 
 		if (shouldDefend) {
@@ -181,7 +171,7 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 		avgY /= visibleEnemies.size();
 		targetLocation = { (int)avgX, (int)avgY };
 
-		// --- 4. Broadcast with Spam Protection ---
+		// Broadcast with Spam Protection
 		// Check if command changed OR if target moved significantly (prevent jitter)
 		bool commandChanged = (currentCommand != previousCommand);
 		bool targetMoved = (abs(previousTarget.x - targetLocation.x) > 2 || abs(previousTarget.y - targetLocation.y) > 2);
@@ -194,8 +184,6 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 
 				auto state = w->getCurrentInternalState();
 
-				// KEEPING YOUR IF STATEMENTS, BUT ADDING THE MISSING CASE:
-
 				// Case A: We are fighting, but need to retreat
 				if (state == STATE_ENGAGING && currentCommand == DEFEND) {
 					w->SetCommand(currentCommand, targetLocation);
@@ -204,8 +192,7 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 				else if (state == STATE_IDLE || state == STATE_SCANNING_AREA) {
 					w->SetCommand(currentCommand, targetLocation);
 				}
-				// Case C (THE FIX): We are hiding, but the Commander says ATTACK!
-				// Without this, hiding warriors ignore the Attack order and stay stuck.
+				// Case C: We are hiding, but the Commander says attack
 				else if (state == STATE_FINDING_COVER && currentCommand == ATTACK) {
 					w->SetCommand(currentCommand, targetLocation);
 				}

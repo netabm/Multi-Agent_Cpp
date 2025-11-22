@@ -107,7 +107,7 @@ Grenade* Warrior::ThrowGrenade(Soldier* target)
 
 	if (distance <= GRENADE_THROW_RANGE)
 	{
-		grenade_ammo--; 
+		grenade_ammo--;
 		return new Grenade(x + 0.5, y + 0.5, target_pos.x + 0.5, target_pos.y + 0.5, this);
 	}
 
@@ -347,16 +347,16 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	std::vector<Bullet*>& active_bullets)
 {
 	// test
-	this->bullet_ammo = W_NUM_BULLETS;
+	//this->bullet_ammo = W_NUM_BULLETS;
 
-	if (!commander || !commander->IsAlive()) return;
+	//if (!commander || !commander->IsAlive()) return;
 
-	if (health > 25) {
-		hasDefensePosition = false;
-		path.clear();
-		currentInternalState = STATE_SCANNING_AREA; // Resume normal behavior
-		return;
-	}
+	//if (health > 25) {
+	//	hasDefensePosition = false;
+	//	path.clear();
+	//	currentInternalState = STATE_SCANNING_AREA;
+	//	return;
+	//}
 
 	if (shoot_cooldown_timer == 0)
 	{
@@ -378,7 +378,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	Point2D myPos = getPosition();
 	Point2D threat = commander->getTargetLocation(); // Enemy centroid from commander
 
-	// 2. Check if current cover is compromised
+	// Check if current cover is compromised
 	// If we are in a defense position but just took damage (health dropped),
 	// this cover is no longer safe.
 	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover)
@@ -388,7 +388,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 		path.clear(); // Clear path to force finding a new spot immediately
 	}
 
-	// 3. Find a new spot if we don't have one
+	// Find a new spot if we don't have one
 	if (!hasDefensePosition)
 	{
 		Point2D found = FindNearestCover(myPos, threat, reserved, map);
@@ -405,7 +405,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 			return;
 		}
 
-		// Fallback: If no cover object found (stones/walls), just retreat away from threat
+		// If no cover found, retreat away from threat
 		if (threat.x != -1)
 		{
 			double dx = myPos.x - threat.x;

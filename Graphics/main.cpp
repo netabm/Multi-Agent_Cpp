@@ -582,7 +582,6 @@ void idle()
 	for (Grenade* grenade : active_grenades) {
 		Bullet** bullets_from_grenade = grenade->getBullets();
 		for (int i = 0; i < NUM_BULLETS; i++) {
-			// *** THIS IS THE FIX ***
 			// Must check if the bullet pointer is valid *before* trying to use it.
 			if (bullets_from_grenade[i] && bullets_from_grenade[i]->getIsMoving()) {
 				bullets_from_grenade[i]->UpdateSecurityMap(map, securityMap);

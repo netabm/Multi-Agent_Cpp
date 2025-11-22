@@ -69,6 +69,18 @@ void Commander::CheckAmmo(const std::vector<Soldier*>& team_soldiers, int map[MS
 			return; // only assign one warrior per frame
 		}
 	}
+
+	// If no one needs ammo, send idle supply soldier back to warehouse
+	for (Soldier* s : team_soldiers)
+	{
+		SupplySoldier* sup = dynamic_cast<SupplySoldier*>(s);
+		if (sup && sup->IsAlive() && sup->getSupportState() == SUPPORT_IDLE)
+		{
+			sup->ReturnToWarehouse();
+		}
+	}
+
+
 }
 
 void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
@@ -122,11 +134,23 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 		availableMedic->AssignSupportTask(bestCoverNeed);
 		return;
 	}
+
+	// If no one needs healing, send idle medic back to warehouse
+	for (Soldier* s : team_soldiers)
+	{
+		Medic* m = dynamic_cast<Medic*>(s);
+		if (m && m->IsAlive() && m->getSupportState() == SUPPORT_IDLE)
+		{
+			m->ReturnToWarehouse();
+		}
+	}
+
 }
 
 
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
+	attack_reserved_spots.clear();
 	targetLocation = { -1, -1 };
 	if (!isAlive) return;
 

@@ -58,12 +58,14 @@ public:
 	WarriorInternalState getCurrentInternalState() const { return currentInternalState; }
 
 
-	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ]);
+	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
 	Soldier* FindClosestVisibleEnemy(const std::vector<Soldier*>& all_soldiers);
 	bool CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ]);
+	bool IsCellOccupied(int x, int y, const std::vector<Soldier*>& all_soldiers);
+
 
 	void SetCommand(CommandType cmd, Point2D location);
-	// Fixed signature: accept the real grenades vector type
+
 	void Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 
 	void HandleMoving(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);

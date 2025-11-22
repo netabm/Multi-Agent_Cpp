@@ -10,6 +10,8 @@ private:
 	CommandType currentCommand;
 public:
 	std::vector<Point2D> defend_reserved_spots{};
+	std::vector<Point2D> attack_reserved_spots{};
+
 	Commander(double start_x, double start_y, int team_id);
 
 	void Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
@@ -20,8 +22,7 @@ public:
 	CommandType getCurrentCommand() const { return currentCommand; }
 	Point2D getTargetLocation() const { return targetLocation; }
 	std::vector<Point2D>& GetReservedDefendSpots() { return defend_reserved_spots; }
+	std::vector<Point2D>& GetReservedAttackSpots() { return attack_reserved_spots; }
 
-
-	//void UpdateVisibility(const std::vector<Soldier*>& team_soldiers, int map[MSZ][MSZ]);
 	bool (*getTeamVisibility())[MSZ] { return team_visibility; }
 };

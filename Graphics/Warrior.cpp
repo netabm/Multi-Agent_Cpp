@@ -308,7 +308,6 @@ void Warrior::HandleMoving(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 		currentInternalState = STATE_SCANNING_AREA;
 		scan_timer = 0;
 	}
-	//Move(map);
 }
 
 void Warrior::HandleScanning(int map[MSZ][MSZ], double securityMap[MSZ][MSZ])

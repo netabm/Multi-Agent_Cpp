@@ -631,30 +631,49 @@ void idle()
 	glutPostRedisplay();
 }
 
+//void MouseClick(int button, int state, int x, int y)
+//{
+//	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+//	{
+//		int target_x = MSZ * x / (double)W;
+//		int target_y = MSZ * (H - y - 1) / (double)H;
+//
+//		if (w01 && w01->IsAlive())
+//		{
+//			// Create a grenade that travels from w01 to the target
+//			Grenade* pg = new Grenade(w01->getX(), w01->getY(), target_x, target_y, w01);
+//
+//			// FOR DEBUG: Make the mouse-clicked one explode instantly
+//			pg->ExplodeNow();
+//
+//			// pg->UpdateSecurityMap(map, securityMap); // UpdateSecurityMap is now called by Update()
+//			active_grenades.push_back(pg);
+//		}
+//
+//		// This test code is fine
+//		if (!soldiers.empty())
+//		{
+//			soldiers[0]->SetTarget(target_x, target_y, map, securityMap);
+//		}
+//	}
+//}
+
 void MouseClick(int button, int state, int x, int y)
 {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
 	{
-		int target_x = MSZ * x / (double)W;
-		int target_y = MSZ * (H - y - 1) / (double)H;
+		// Calculate map coordinates from mouse pixels
+		double click_x = MSZ * x / (double)W;
+		double click_y = MSZ * (H - y - 1) / (double)H;
 
-		if (w01 && w01->IsAlive())
-		{
-			// Create a grenade that travels from w01 to the target
-			Grenade* pg = new Grenade(w01->getX(), w01->getY(), target_x, target_y, w01);
+		// Create the grenade at the clicked position.
+		Grenade* pg = new Grenade(click_x, click_y, click_x, click_y, nullptr);
 
-			// FOR DEBUG: Make the mouse-clicked one explode instantly
-			pg->ExplodeNow();
+		// Force immediate explosion
+		pg->ExplodeNow();
 
-			// pg->UpdateSecurityMap(map, securityMap); // UpdateSecurityMap is now called by Update()
-			active_grenades.push_back(pg);
-		}
-
-		// This test code is fine
-		if (!soldiers.empty())
-		{
-			soldiers[0]->SetTarget(target_x, target_y, map, securityMap);
-		}
+		// Add to active list so the update loop handles the shrapnel/bullets
+		active_grenades.push_back(pg);
 	}
 }
 

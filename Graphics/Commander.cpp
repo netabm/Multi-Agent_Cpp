@@ -197,8 +197,8 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 	}
 	bool enemyVisible = !visibleEnemies.empty();
 
-	CommandType previousCommand = IDLE;
-	Point2D previousTarget = { -1, -1 };
+	static CommandType previousCommand = IDLE;
+	static Point2D previousTarget = { -1, -1 };
 
 	if (enemyVisible) {
 		// Only defend if we have a Medic and the team is actually hurt

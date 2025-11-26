@@ -13,7 +13,10 @@ protected:
         return (team == 0) ? Point2D{ 2,2 } : Point2D{ MSZ - 3, MSZ - 9 };
     }
 
-    void ApplyEffect(Warrior* warrior) override {
-        warrior->reloadAmmo();
+    void ApplyEffect(Soldier* soldier) override {
+        Warrior* w = dynamic_cast<Warrior*>(soldier);
+        if (w) {
+            w->reloadAmmo();
+        }
     }
 };

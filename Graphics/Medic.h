@@ -13,7 +13,7 @@ protected:
         return (team == 0) ? Point2D{ 2,8 } : Point2D{ MSZ - 3, MSZ - 3 };
     }
 
-    void ApplyEffect(Warrior* warrior) override {
-        warrior->heal();
+    void ApplyEffect(Soldier* patient) override {
+        patient->heal();
     }
 };

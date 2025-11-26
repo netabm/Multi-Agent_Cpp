@@ -64,37 +64,23 @@ void Warrior::Show()
 
 Bullet* Warrior::Shoot(Soldier* target)
 {
-	// Check ammo and target validity
 	if (bullet_ammo <= 0 || target == nullptr || !target->IsAlive()) {
 		return nullptr;
 	}
 
-	// Use precise coordinates for calculations
+	bullet_ammo--;
+
+	// Use precise coordinates for angle calculation
 	double target_x_precise = target->getX();
 	double target_y_precise = target->getY();
 
-	// Calculate squared distance for efficiency (precise shooter to precise target)
-	double dx_dist = target_x_precise - x;
-	double dy_dist = target_y_precise - y;
-	double dist_sq = dx_dist * dx_dist + dy_dist * dy_dist; // Use squared distance
+	double angle = atan2((target_y_precise + 0.5) - (y + 0.5),
+		(target_x_precise + 0.5) - (x + 0.5));
 
-	// Check range using squared distance
-	// Add a small tolerance (e.g., half a unit squared) to prevent range issues at edge cases
-	double range_sq_with_tolerance = (WARRIOR_FIRING_RANGE + 0.5) * (WARRIOR_FIRING_RANGE + 0.5);
+	Bullet* new_bullet = new Bullet(x + 0.5, y + 0.5, angle, this);
+	new_bullet->setIsMoving(true);
 
-	if (dist_sq <= range_sq_with_tolerance) {
-		bullet_ammo--;
-
-		double angle = atan2((target_y_precise + 0.5) - (y + 0.5),
-			(target_x_precise + 0.5) - (x + 0.5));
-
-		// Create bullet, passing 'this' as the shooter
-		Bullet* new_bullet = new Bullet(x + 0.5, y + 0.5, angle, this); // Pass 'this'
-		new_bullet->setIsMoving(true); // Activate the bullet
-
-		return new_bullet;
-	}
-	return nullptr; // Target out of range
+	return new_bullet;
 }
 
 bool Warrior::CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ])
@@ -385,6 +371,11 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 		// Check shot from centers
 		bool clearShot = CheckFirePath(x + 0.5, y + 0.5, tgtPos.x + 0.5, tgtPos.y + 0.5, map);
 
+		if (team == 1) { // Only print for the orange guy
+			printf("Dist: %.2f | RangeLimit: %.2f | InRange: %d | ClearShot: %d\n",
+				dist, WARRIOR_FIRING_RANGE, inRange, clearShot);
+		}
+
 		if (inRange && clearShot)
 		{
 			// We have a valid shot. Stop and fire.
@@ -448,7 +439,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	if (shoot_cooldown_timer == 0)
 	{
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-		
+
 		if (enemy)
 		{
 			// FIX: Check if we actually have a clear shot path before shooting.
@@ -471,14 +462,14 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 
 	auto& reserved = commander->GetReservedDefendSpots();
 	Point2D myPos = getPosition();
-	Point2D threat = commander->getTargetLocation(); 
+	Point2D threat = commander->getTargetLocation();
 
 	// 2. Check if current cover is compromised
 	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover)
 	{
 		hasDefensePosition = false;
 		lastHealthInCover = -1;
-		path.clear(); 
+		path.clear();
 	}
 
 	// 3. Find a new spot if we don't have one
@@ -489,7 +480,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 		if (found.x != -1)
 		{
 			defensePosition = found;
-			reserved.push_back(found); 
+			reserved.push_back(found);
 			hasDefensePosition = true;
 			lastHealthInCover = health;
 
@@ -531,7 +522,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	}
 
 	// 5. We are IN POSITION (Holding the line)
-	lastHealthInCover = health; 
+	lastHealthInCover = health;
 }
 
 Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers) {
@@ -689,4 +680,3 @@ bool Warrior::IsCellOccupied(int x, int y, const std::vector<Soldier*>& all_sold
 	}
 	return false;
 }
-

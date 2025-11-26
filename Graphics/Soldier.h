@@ -25,6 +25,7 @@ public:
 	virtual void Show();
 
 	int getHealth() { return health; }
+	void heal() { health = 100; }
 	bool IsAlive() const { return isAlive; }
 	bool getIsMoving() { return isMoving; }
 	int getTeam() { return team; }

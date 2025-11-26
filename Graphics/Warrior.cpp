@@ -59,7 +59,6 @@ void Warrior::Show()
 	for (char c : ammo_str) {
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c); // Use a small font
 	}
-
 }
 
 Bullet* Warrior::Shoot(Soldier* target)
@@ -85,62 +84,40 @@ Bullet* Warrior::Shoot(Soldier* target)
 
 bool Warrior::CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ])
 {
-	double dx = targetX - startX;
-	double dy = targetY - startY;
-	double dist = sqrt(dx * dx + dy * dy);
+	int x0 = (int)startX;
+	int y0 = (int)startY;
+	int x1 = (int)targetX;
+	int y1 = (int)targetY;
 
-	// FIX 1: Only return true if we are basically inside the same pixel. 
-	// 1.0 was way too generous.
-	if (dist < 0.05) return true;
+	int dx = abs(x1 - x0);
+	int dy = abs(y1 - y0);
+	int sx = (x0 < x1) ? 1 : -1;
+	int sy = (y0 < y1) ? 1 : -1;
+	int err = dx - dy;
 
-	double dirX = dx / dist;
-	double dirY = dy / dist;
+	int x = x0;
+	int y = y0;
 
-	double currX = startX;
-	double currY = startY;
-	double stepSize = 0.05;
-
-	// FIX 2: Check closer to the target. 
-	// Previously 'dist - 0.5' meant we stopped checking half a tile early.
-	// If the enemy is right next to a wall, we might miss the wall.
-	// stopping at 'dist - 0.1' ensures we check the space right up to their face.
-	for (double d = 0; d < dist - 0.1; d += stepSize)
+	while (true)
 	{
-		currX += dirX * stepSize;
-		currY += dirY * stepSize;
+		// don't check the starting cell (the shooter’s own tile)
+		if (!(x == x0 && y == y0))
+		{
+			if (x < 0 || x >= MSZ || y < 0 || y >= MSZ)
+				return false;
 
-		int gridX = (int)currX;
-		int gridY = (int)currY;
-
-		// Sanity check to ensure we don't check out of bounds
-		if (gridX < 0 || gridX >= MSZ || gridY < 0 || gridY >= MSZ) return false;
-
-		// FIX 3: If the ray has reached the target's actual cell, stop checking.
-		// We don't want to return 'false' just because the target is standing near a tree.
-		if (gridX == (int)targetX && gridY == (int)targetY) break;
-
-		// 1. Direct Hit Check
-		if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE) return false;
-
-		// 2. "Thick Bullet" Check (Corner grazing)
-		double subX = currX - gridX;
-		double subY = currY - gridY;
-		double safetyMargin = 0.3;
-
-		if (subX > (1.0 - safetyMargin)) {
-			if (gridX + 1 < MSZ && (map[gridY][gridX + 1] == STONE || map[gridY][gridX + 1] == TREE)) return false;
-		}
-		else if (subX < safetyMargin) {
-			if (gridX - 1 >= 0 && (map[gridY][gridX - 1] == STONE || map[gridY][gridX - 1] == TREE)) return false;
+			if (map[y][x] == STONE || map[y][x] == TREE)
+				return false;
 		}
 
-		if (subY > (1.0 - safetyMargin)) {
-			if (gridY + 1 < MSZ && (map[gridY + 1][gridX] == STONE || map[gridY + 1][gridX] == TREE)) return false;
-		}
-		else if (subY < safetyMargin) {
-			if (gridY - 1 >= 0 && (map[gridY - 1][gridX] == STONE || map[gridY - 1][gridX] == TREE)) return false;
-		}
+		if (x == x1 && y == y1)
+			break;
+
+		int e2 = 2 * err;
+		if (e2 > -dy) { err -= dy; x += sx; }
+		if (e2 < dx) { err += dx; y += sy; }
 	}
+
 	return true;
 }
 
@@ -164,23 +141,19 @@ Grenade* Warrior::ThrowGrenade(Soldier* target)
 void Warrior::SetCommand(CommandType cmd, Point2D location) {
 	if (!IsAlive()) return;
 
-	// If the command and location are unchanged, do nothing (avoid wiping path every frame)
 	if (currentCommand == cmd && targetLocation.x == location.x && targetLocation.y == location.y) {
 		return;
 	}
 
-	// Only reset cover when transitioning into DEFEND from another state
 	if (cmd == DEFEND && currentCommand != DEFEND) {
-		hasDefensePosition = false;
-		lastHealthInCover = -1;  // reset health in cover
-	}
-
-	// Leaving DEFEND
-	if (cmd != DEFEND) {
 		hasDefensePosition = false;
 		lastHealthInCover = -1;
 	}
 
+	if (cmd != DEFEND) {
+		hasDefensePosition = false;
+		lastHealthInCover = -1;
+	}
 
 	currentCommand = cmd;
 	targetLocation = location;
@@ -207,13 +180,35 @@ Soldier* Warrior::FindClosestVisibleEnemy(const std::vector<Soldier*>& all_soldi
 	return closest;
 }
 
-void Warrior::Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bullet*>& active_bullets, std::vector<Grenade*>& active_grenades, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
+void Warrior::Update(const std::vector<Soldier*>& all_soldiers,
+	std::vector<Bullet*>& active_bullets,
+	std::vector<Grenade*>& active_grenades,
+	int map[MSZ][MSZ],
+	double securityMap[MSZ][MSZ])
 {
 	if (!IsAlive()) return;
 
-	if (!commander || !commander->IsAlive()) {
-		currentCommand = IDLE;
-		targetLocation = { -1, -1 };
+	// --- 1. ROSTER CHECK (Prevent Crash) ---
+	if (commander) {
+		bool commanderStillExists = false;
+		for (Soldier* s : all_soldiers) {
+			if (s == commander) {
+				commanderStillExists = true;
+				break;
+			}
+		}
+		if (!commanderStillExists) commander = nullptr;
+	}
+
+	// Autonomous logic
+	if (commander == nullptr)
+	{
+		if (health < 25) {
+			currentCommand = DEFEND;
+		}
+		else {
+			currentCommand = ATTACK;
+		}
 	}
 
 	// --- Cooldowns ---
@@ -225,22 +220,29 @@ void Warrior::Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bull
 
 	// --- Detect closest visible enemy ---
 	Soldier* visibleEnemy = FindClosestVisibleEnemy(all_soldiers);
-	if (visibleEnemy) {
-		// Engage visible enemy immediately
+
+	if (visibleEnemy && visibleEnemy->IsAlive()) {
 		currentTargetEnemy = visibleEnemy;
-		if (currentCommand != DEFEND) {
-			currentInternalState = STATE_ENGAGING;
+
+		if (currentCommand == DEFEND) {
+			currentInternalState = STATE_FINDING_COVER;
 		}
 		else {
-			currentInternalState = STATE_FINDING_COVER;
+			currentInternalState = STATE_ENGAGING;
 		}
 	}
 	else {
-		// No visible enemy: act based on commander command
+		// No enemy visible
 		currentTargetEnemy = nullptr;
+
 		switch (currentCommand) {
 		case ATTACK:
-			if (targetLocation.x >= 0) {
+			// If autonomous and attacking but no enemy seen, Scan the area
+			if (commander == nullptr) {
+				currentInternalState = STATE_SCANNING_AREA;
+			}
+			else if (targetLocation.x >= 0) {
+				// Follow commander's order
 				double dist = hypot(x - targetLocation.x, y - targetLocation.y);
 				currentInternalState = (dist > 2.0) ? STATE_MOVING : STATE_SCANNING_AREA;
 			}
@@ -250,11 +252,13 @@ void Warrior::Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bull
 			break;
 
 		case DEFEND:
+			// If we need to defend but see no one, we still need to find a cover spot
 			currentInternalState = STATE_FINDING_COVER;
 			break;
 
 		case IDLE:
 		default:
+			// If autonomous, IDLE usually means SCAN
 			currentInternalState = STATE_SCANNING_AREA;
 			break;
 		}
@@ -265,22 +269,18 @@ void Warrior::Update(const std::vector<Soldier*>& all_soldiers, std::vector<Bull
 	case STATE_MOVING:
 		HandleMoving(map, securityMap);
 		break;
-
 	case STATE_SCANNING_AREA:
 		HandleScanning(map, securityMap);
 		break;
-
 	case STATE_ENGAGING:
 		HandleEngaging(active_bullets, active_grenades, map, securityMap, all_soldiers);
 		break;
-
 	case STATE_FINDING_COVER:
 		HandleFindingCover(map, securityMap, all_soldiers, active_bullets);
 		break;
-
 	case STATE_IDLE:
 	default:
-		break; // do nothing
+		break;
 	}
 }
 
@@ -331,9 +331,10 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	}
 
 	Point2D tgtPos = currentTargetEnemy->getPosition();
+	int tx = clamp(tgtPos.x, 0, MSZ - 1);
+	int ty = clamp(tgtPos.y, 0, MSZ - 1);
 
-	// 1. General Visibility Check (Can we see them at all?)
-	if (!visibility[tgtPos.y][tgtPos.x]) {
+	if (!visibility[ty][tx]) {
 		currentTargetEnemy = nullptr;
 		currentInternalState = STATE_SCANNING_AREA;
 		scan_timer = 0;
@@ -344,7 +345,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	double dy = tgtPos.y + 0.5 - y;
 	double dist = hypot(dx, dy);
 
-	// --- GRENADE LOGIC ---
+	// Grenade logic
 	const double MIN_GRENADE_DISTANCE = 8.0;
 	const double MAX_GRENADE_DISTANCE = GRENADE_THROW_RANGE;
 	const double GRENADE_CHANCE = 0.005;
@@ -360,178 +361,158 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 			active_grenades.push_back(g);
 			grenade_cooldown_timer = WARRIOR_GRENADE_COOLDOWN_FRAMES;
 		}
+
+		return;
+	}
+
+	// --- KEY FIX: Check if we're ALREADY in a good position ---
+	bool inRange = (dist <= WARRIOR_FIRING_RANGE);
+	bool clearShot = CheckFirePath(x + 0.5, y + 0.5, tgtPos.x + 0.5, tgtPos.y + 0.5, map);
+
+	if (inRange && clearShot) {
 		path.clear();
 		isMoving = false;
+
+		if (shoot_cooldown_timer == 0) {
+			Bullet* b = Shoot(currentTargetEnemy);
+			if (b) {
+				b->setIsMoving(true);
+				active_bullets.push_back(b);
+			}
+			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
+		}
+		return;
 	}
-	else
-	{
-		// --- SHOOTING LOGIC ---
-		bool inRange = (dist <= WARRIOR_FIRING_RANGE);
 
-		// Check shot from centers
-		bool clearShot = CheckFirePath(x + 0.5, y + 0.5, tgtPos.x + 0.5, tgtPos.y + 0.5, map);
+	// --- Only move if NOT already moving to a valid position ---
+	Point2D myPos = getPosition();
 
-		if (team == 1) { // Only print for the orange guy
-			printf("Dist: %.2f | RangeLimit: %.2f | InRange: %d | ClearShot: %d\n",
-				dist, WARRIOR_FIRING_RANGE, inRange, clearShot);
-		}
+	// If we're already moving, let the movement complete before recalculating
+	if (isMoving && !path.empty()) {
+		return;
+	}
 
-		if (inRange && clearShot)
-		{
-			// We have a valid shot. Stop and fire.
-			path.clear();
-			isMoving = false;
-			if (shoot_cooldown_timer == 0) {
-				Bullet* b = Shoot(currentTargetEnemy);
-				if (b) {
-					b->setIsMoving(true);
-					active_bullets.push_back(b);
-				}
-				shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES;
-			}
-		}
-		else
-		{
-			// Either too far or obstacle in way: pick attack position
-			Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map, all_soldiers);
+	// Calculate new attack position only if needed
+	Point2D attackPos = CalculateAttackPosition(currentTargetEnemy, map, all_soldiers);
 
-			// If CalculateAttackPosition failed and returned our current cell, nudge toward target
-			Point2D myPos = getPosition();
-			if ((attackPos.x == myPos.x && attackPos.y == myPos.y) && (tgtPos.x != myPos.x || tgtPos.y != myPos.y)) {
-				// Compute a one-cell nudge toward the target (fallback)
-				double ddx = tgtPos.x - myPos.x;
-				double ddy = tgtPos.y - myPos.y;
-				double len = sqrt(ddx * ddx + ddy * ddy);
-				if (len > 0.0) {
-					int nudgeX = myPos.x + (int)round((ddx / len) * 1.0);
-					int nudgeY = myPos.y + (int)round((ddy / len) * 1.0);
-
-					// clamp and validate
-					if (nudgeX < 0) nudgeX = 0; if (nudgeX >= MSZ) nudgeX = MSZ - 1;
-					if (nudgeY < 0) nudgeY = 0; if (nudgeY >= MSZ) nudgeY = MSZ - 1;
-
-					if (map[nudgeY][nudgeX] != STONE && map[nudgeY][nudgeX] != WATER && map[nudgeY][nudgeX] != TREE
-						&& !IsCellOccupied(nudgeX, nudgeY, all_soldiers))
-					{
-						attackPos = { nudgeX, nudgeY };
-					}
-				}
-			}
-
-			// Move if we aren't already moving
-			if ((attackPos.x != myPos.x || attackPos.y != myPos.y) && (path.empty() || !isMoving)) {
-				SetTarget(attackPos.x, attackPos.y, map, securityMap);
-			}
-			else if (attackPos.x == myPos.x && attackPos.y == myPos.y) {
-				// If still cannot move, switch to scanning so unit doesn't freeze forever.
-				currentInternalState = STATE_SCANNING_AREA;
-				scan_timer = 0;
-			}
-		}
+	if ((attackPos.x != myPos.x || attackPos.y != myPos.y)) {
+		SetTarget(attackPos.x, attackPos.y, map, securityMap);
 	}
 }
+
 
 void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ],
 	const std::vector<Soldier*>& all_soldiers,
 	std::vector<Bullet*>& active_bullets)
 {
-	// 1. Defensive Fire Logic
-	if (shoot_cooldown_timer == 0)
-	{
+	// Defensive fire
+	if (shoot_cooldown_timer == 0) {
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-
-		if (enemy)
-		{
-			// FIX: Check if we actually have a clear shot path before shooting.
-			// Even if the enemy is "visible", a tree might block the center-to-center bullet path.
-			if (CheckFirePath(x + 0.5, y + 0.5, enemy->getX() + 0.5, enemy->getY() + 0.5, map))
-			{
-				Bullet* b = Shoot(enemy);
-				if (b)
-				{
-					b->setIsMoving(true);
-					active_bullets.push_back(b);
-				}
-				// Shoot slower when in cover (defensive fire)
-				shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES * 2;
+		if (enemy && CheckFirePath(x + 0.5, y + 0.5, enemy->getX() + 0.5, enemy->getY() + 0.5, map)) {
+			Bullet* b = Shoot(enemy);
+			if (b) {
+				b->setIsMoving(true);
+				active_bullets.push_back(b);
 			}
+			shoot_cooldown_timer = WARRIOR_SHOOT_COOLDOWN_FRAMES * 2;
 		}
 	}
 
-	if (!commander || !commander->IsAlive()) return; // Safety check
+	// Safe reserved reference
+	std::vector<Point2D> dummy_reserved;
+	std::vector<Point2D>* reserved_ptr = &dummy_reserved;
+	Point2D threat = { -1, -1 };
 
-	auto& reserved = commander->GetReservedDefendSpots();
+	if (commander && commander->IsAlive()) {
+		reserved_ptr = &commander->GetReservedDefendSpots();
+		threat = commander->getTargetLocation();
+	}
+	else {
+		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
+		if (enemy) threat = enemy->getPosition();
+	}
+	auto& reserved = *reserved_ptr;
 	Point2D myPos = getPosition();
-	Point2D threat = commander->getTargetLocation();
 
-	// 2. Check if current cover is compromised
-	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover)
-	{
+	// Check compromised cover
+	if (hasDefensePosition && lastHealthInCover != -1 && health < lastHealthInCover) {
 		hasDefensePosition = false;
 		lastHealthInCover = -1;
 		path.clear();
 	}
 
-	// 3. Find a new spot if we don't have one
-	if (!hasDefensePosition)
-	{
+	// Find new cover
+	if (!hasDefensePosition) {
 		Point2D found = FindNearestCover(myPos, threat, reserved, map);
-
-		if (found.x != -1)
-		{
+		if (found.x != -1) {
 			defensePosition = found;
-			reserved.push_back(found);
+			if (commander && commander->IsAlive()) reserved.push_back(found);
 			hasDefensePosition = true;
 			lastHealthInCover = health;
-
-			// Start moving there
 			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
 			return;
 		}
 
-		// If no cover found, retreat away from threat
-		if (threat.x != -1)
-		{
+		// Retreat if no cover
+		if (threat.x != -1) {
 			double dx = myPos.x - threat.x;
 			double dy = myPos.y - threat.y;
 			double len = sqrt(dx * dx + dy * dy);
-
 			if (len > 0) {
-				int retreatX = (int)(myPos.x + (dx / len) * 5);
-				int retreatY = (int)(myPos.y + (dy / len) * 5);
-
-				if (retreatX < 0) retreatX = 0; if (retreatX >= MSZ) retreatX = MSZ - 1;
-				if (retreatY < 0) retreatY = 0; if (retreatY >= MSZ) retreatY = MSZ - 1;
-
-				if (path.empty() || !isMoving) {
-					SetTarget(retreatX, retreatY, map, securityMap);
-				}
+				int retreatX = myPos.x + (int)((dx / len) * 5);
+				int retreatY = myPos.y + (int)((dy / len) * 5);
+				retreatX = std::max(0, std::min(MSZ - 1, retreatX));
+				retreatY = std::max(0, std::min(MSZ - 1, retreatY));
+				if (path.empty() || !isMoving) SetTarget(retreatX, retreatY, map, securityMap);
 			}
 		}
 		return;
 	}
 
-	// 4. Move towards the chosen cover
+	// Move toward cover
 	double dist = hypot(myPos.x - defensePosition.x, myPos.y - defensePosition.y);
-
-	if (dist > 1.5)
-	{
+	if (dist > 1.5) {
 		if (path.empty() || !isMoving)
 			SetTarget(defensePosition.x, defensePosition.y, map, securityMap);
 		return;
 	}
 
-	// 5. We are IN POSITION (Holding the line)
+	// In position
 	lastHealthInCover = health;
 }
 
-Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers) {
+Point2D Warrior::CalculateAttackPosition(Soldier * target, int map[MSZ][MSZ], const std::vector<Soldier*>&all_soldiers) {
 	if (!target || !target->IsAlive()) return getPosition();
 
 	Point2D targetPos = target->getPosition();
 	Point2D currentPos = getPosition();
 
-	auto& reserved = commander->GetReservedAttackSpots();
+	// --- FIX START: Safe Vector Setup ---
+	// 1. Verify Commander actually exists (prevent dangling pointer crash)
+	bool commanderIsValid = false;
+	if (commander) {
+		for (Soldier* s : all_soldiers) {
+			if (s == commander) {
+				commanderIsValid = true;
+				break;
+			}
+		}
+	}
+
+	// 2. Create a safe reference to a vector
+	// If commander is dead/invalid, 'reserved' points to this local dummy.
+	// If commander is alive, 'reserved' points to the real list.
+	std::vector<Point2D> dummy_reserved;
+	std::vector<Point2D>* reserved_ptr = &dummy_reserved;
+
+	if (commanderIsValid && commander->IsAlive()) {
+		reserved_ptr = &commander->GetReservedAttackSpots();
+	}
+
+	// Now use this reference for the rest of the function
+	auto& reserved = *reserved_ptr;
+	// --- FIX END ---
+
 
 	Point2D bestShootingPos = { -1, -1 };
 	double minDistSqToWarrior = 1e9;
@@ -551,6 +532,8 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 			if (map[yCandidate][xCandidate] == STONE || map[yCandidate][xCandidate] == WATER || map[yCandidate][xCandidate] == TREE) continue;
 
 			Point2D candidate = { xCandidate, yCandidate };
+
+			// Safe check using 'reserved'
 			bool isReserved = false;
 			for (const Point2D& r : reserved) {
 				if (r.x == candidate.x && r.y == candidate.y) {
@@ -559,6 +542,7 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 				}
 			}
 			if (isReserved) continue;
+
 			if (IsCellOccupied(xCandidate, yCandidate, all_soldiers)) continue;
 
 
@@ -582,12 +566,12 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 	}
 
 	if (bestShootingPos.x != -1) {
-		reserved.push_back(bestShootingPos);
+		reserved.push_back(bestShootingPos); // Safe push
 		return bestShootingPos;
 	}
 
 	if (bestChasePos.x != -1) {
-		reserved.push_back(bestChasePos);
+		reserved.push_back(bestChasePos); // Safe push
 		return bestChasePos;
 	}
 
@@ -606,6 +590,8 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 			if (map[yCandidate][xCandidate] == STONE || map[yCandidate][xCandidate] == WATER || map[yCandidate][xCandidate] == TREE) continue;
 
 			Point2D candidate = { xCandidate, yCandidate };
+
+			// Safe check using 'reserved'
 			bool isReserved = false;
 			for (const Point2D& r : reserved) {
 				if (r.x == candidate.x && r.y == candidate.y) {
@@ -614,6 +600,7 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 				}
 			}
 			if (isReserved) continue;
+
 			if (IsCellOccupied(xCandidate, yCandidate, all_soldiers)) continue;
 
 			double distSqToTarget = dx * dx + dy * dy;
@@ -634,7 +621,7 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 	}
 
 	if (bestFlankPos.x != -1) {
-		reserved.push_back(bestFlankPos);
+		reserved.push_back(bestFlankPos); // Safe push
 		return bestFlankPos;
 	}
 
@@ -663,7 +650,7 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 	}
 
 	if (moveToward.x != -1) {
-		reserved.push_back(moveToward);
+		reserved.push_back(moveToward); // Safe push
 		return moveToward;
 	}
 
@@ -673,7 +660,6 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 bool Warrior::IsCellOccupied(int x, int y, const std::vector<Soldier*>& all_soldiers) {
 	for (Soldier* s : all_soldiers) {
 		if (!s->IsAlive()) continue;
-		// Don't check against self
 		if (s == this) continue;
 		Point2D pos = s->getPosition();
 		if ((int)pos.x == x && (int)pos.y == y) return true;

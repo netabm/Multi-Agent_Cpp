@@ -148,9 +148,10 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 
 void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::vector<Soldier*>& all_soldiers, int map[MSZ][MSZ], double securityMap[MSZ][MSZ])
 {
+	if (!isAlive) return;
+	defend_reserved_spots.clear();
 	attack_reserved_spots.clear();
 	targetLocation = { -1, -1 };
-	if (!isAlive) return;
 
 	CalculateTeamVisibility(team_soldiers, getTeam(), map, team_visibility);
 	CheckAmmo(team_soldiers, map, securityMap);

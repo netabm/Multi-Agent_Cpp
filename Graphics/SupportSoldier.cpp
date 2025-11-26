@@ -1,5 +1,8 @@
 #include "SupportSoldier.h"
-
+#include "Medic.h"
+#include "SupplySoldier.h"
+#include "Commander.h"
+    
 SupportSoldier::SupportSoldier(double start_x, double start_y, int team_id)
     : Soldier(start_x, start_y, team_id),
     current_support_state(SUPPORT_IDLE),

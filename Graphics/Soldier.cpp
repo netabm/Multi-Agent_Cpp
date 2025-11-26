@@ -130,7 +130,7 @@ bool Soldier::isNear(const Point2D& cell, double threshold) const {
 
 void Soldier::TakeDamage() {
 	health -= DAMAGE;
-	if (health < 0) {
+	if (health <= 0) {
 		health = 0;
 		isAlive = false;
 	}

@@ -507,10 +507,6 @@ void displayTeamVisibility()
 	// Draw the gradient visibility map background
 	DrawVisibilityMap(); // Uses teamToShow global variable
 
-	// Draw Grenades / Bullets (Optional for this view)
-	// for (Grenade* g : active_grenades) g->Show();
-	// for (Bullet* b : active_bullets) b->Show();
-
 	// Draw Soldiers for ALL teams (so you see enemies in visible areas)
 	for (Soldier* s : soldiers) {
 		s->Show();

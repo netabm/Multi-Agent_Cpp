@@ -3,7 +3,7 @@
 #include "Soldier.h"
 const double B_SPEED = 0.07;
 const double SECURITY = 0.03;
-const double B_RANGE = 7.0;
+const double B_RANGE = 7.5;
 
 class Bullet
 {

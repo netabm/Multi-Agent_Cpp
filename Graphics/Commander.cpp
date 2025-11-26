@@ -88,7 +88,7 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 {
 	if (!isAlive) return;
 
-	// Find an idle medic
+	// 1. Find an available Medic
 	Medic* availableMedic = nullptr;
 	for (Soldier* s : team_soldiers) {
 		Medic* m = dynamic_cast<Medic*>(s);
@@ -99,52 +99,50 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 	}
 	if (!availableMedic) return;
 
-	Warrior* bestLowHP = nullptr;
-	Warrior* bestCoverNeed = nullptr;
+	// Change these from Warrior* to Soldier* so they can store any unit type
+	Soldier* bestLowHP = nullptr;
+	Soldier* bestCoverNeed = nullptr;
 
-	// Scan for warriors who need healing
+	// 2. Scan ALL soldiers (Commander, Warriors, Supply, etc.)
 	for (Soldier* s : team_soldiers)
 	{
-		Warrior* w = dynamic_cast<Warrior*>(s);
-		if (!w || !w->IsAlive()) continue;
+		if (!s || !s->IsAlive()) continue;
 
-		int hp = w->getHealth();
-		int state = w->getCurrentInternalState();
+		if (s == availableMedic) continue;
+		int hp = s->getHealth();
 
-		// Priority 1: lowest HP warrior <= 25
+		// Priority 1: CRITICAL HP (Any Unit Type)
 		if (hp <= 25) {
 			if (!bestLowHP || hp < bestLowHP->getHealth())
-				bestLowHP = w;
+				bestLowHP = s;
 		}
 
-		// Priority 2: warrior finding cover (pick the lowest HP among them)
-		if (state == STATE_FINDING_COVER) {
-			if (!bestCoverNeed || hp < bestCoverNeed->getHealth())
-				bestCoverNeed = w;
+		// Priority 2: Warriors specifically finding cover
+		// We try to cast to Warrior just for this specific check
+		Warrior* w = dynamic_cast<Warrior*>(s);
+		if (w) {
+			int state = w->getCurrentInternalState();
+			if (state == STATE_FINDING_COVER) {
+				if (!bestCoverNeed || hp < bestCoverNeed->getHealth())
+					bestCoverNeed = w;
+			}
 		}
 	}
+	// 3. Assign task by priority
 
-	// Assign task by priority
+	// Priority A: Someone is about to die (Commander, Warrior, or Supply)
 	if (bestLowHP) {
 		availableMedic->AssignSupportTask(bestLowHP);
 		return;
 	}
 
+	// Priority B: A Warrior is pinned down and finding cover
 	if (bestCoverNeed) {
 		availableMedic->AssignSupportTask(bestCoverNeed);
 		return;
 	}
 
-	// If no one needs healing, send idle medic back to warehouse
-	for (Soldier* s : team_soldiers)
-	{
-		Medic* m = dynamic_cast<Medic*>(s);
-		if (m && m->IsAlive() && m->getSupportState() == SUPPORT_IDLE)
-		{
-			m->ReturnToWarehouse();
-		}
-	}
-
+	availableMedic->ReturnToWarehouse();
 }
 
 

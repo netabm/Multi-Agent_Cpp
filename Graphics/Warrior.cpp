@@ -82,7 +82,7 @@ Bullet* Warrior::Shoot(Soldier* target)
 	return new_bullet;
 }
 
-bool Warrior::CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ])
+bool Warrior::CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers)
 {
 	double dx = targetX - startX;
 	double dy = targetY - startY;
@@ -99,7 +99,7 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 	double stepSize = 0.05;
 
 	// Start offset
-	for (double d = 0.3; d < dist; d += stepSize)
+	for (double d = 0.0; d < dist; d += stepSize)
 	{
 		currX += dirX * stepSize;
 		currY += dirY * stepSize;
@@ -109,37 +109,45 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 
 		if (gridX < 0 || gridX >= MSZ || gridY < 0 || gridY >= MSZ) return false;
 
-		// --- HITBOX CHECK ---
-		// If we are touching the enemy (radius 0.5), it's a hit.
+		// --- HITBOX CHECK (Target) ---
 		double distToTarget = sqrt(pow(currX - targetX, 2) + pow(currY - targetY, 2));
 		if (distToTarget < 0.5) return true;
+
+		// --- NEW: FRIENDLY FIRE CHECK ---
+		// Check if this bullet point hits any teammate
+		for (Soldier* s : all_soldiers) {
+			// Skip self, skip dead, skip enemies (we want to hit enemies)
+			if (s == this || !s->IsAlive() || s->getTeam() != this->team) continue;
+
+			// Calculate distance from bullet to teammate
+			double distToAlly = sqrt(pow(currX - s->getX(), 2) + pow(currY - s->getY(), 2));
+
+			// If bullet touches teammate (radius 0.5), BLOCK THE SHOT
+			if (distToAlly < 0.5) {
+				return false;
+			}
+		}
+		// -------------------------------
 
 		// --- OBSTACLE CHECK ---
 		if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE) return false;
 
 		// --- THICKNESS CHECK ---
-		// FIX: INCREASED MARGIN
-		// Previous: 0.15 (0.3 total width) -> Too thin, clips corners.
-		// New: 0.25 (0.5 total width) -> Safer. If the shot is tight, we say "Blocked" and move.
 		if (distToTarget > 0.8)
 		{
 			double subX = currX - gridX;
 			double subY = currY - gridY;
-			double safetyMargin = 0.25; // <--- INCREASED THIS
+			double safetyMargin = 0.25;
 
-			// Check Right
 			if (subX > (1.0 - safetyMargin)) {
 				if (gridX + 1 < MSZ && (map[gridY][gridX + 1] == STONE || map[gridY][gridX + 1] == TREE)) return false;
 			}
-			// Check Left
 			else if (subX < safetyMargin) {
 				if (gridX - 1 >= 0 && (map[gridY][gridX - 1] == STONE || map[gridY][gridX - 1] == TREE)) return false;
 			}
-			// Check Top
 			if (subY > (1.0 - safetyMargin)) {
 				if (gridY + 1 < MSZ && (map[gridY + 1][gridX] == STONE || map[gridY + 1][gridX] == TREE)) return false;
 			}
-			// Check Bottom
 			else if (subY < safetyMargin) {
 				if (gridY - 1 >= 0 && (map[gridY - 1][gridX] == STONE || map[gridY - 1][gridX] == TREE)) return false;
 			}
@@ -148,8 +156,6 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 
 	return true;
 }
-
-
 
 Grenade* Warrior::ThrowGrenade(Soldier* target)
 {
@@ -396,7 +402,7 @@ void Warrior::HandleEngaging(std::vector<Bullet*>& active_bullets,
 	}
 
 	bool inRange = (dist <= WARRIOR_FIRING_RANGE);
-	bool clearShot = CheckFirePath(x + 0.5, y + 0.5, tgtPos.x + 0.5, tgtPos.y + 0.5, map);
+	bool clearShot = CheckFirePath(x + 0.5, y + 0.5, tgtPos.x + 0.5, tgtPos.y + 0.5, map, all_soldiers);
 
 	if (inRange && clearShot) {
 		path.clear();
@@ -449,7 +455,7 @@ void Warrior::HandleFindingCover(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]
 	// Defensive fire
 	if (shoot_cooldown_timer == 0) {
 		Soldier* enemy = FindClosestVisibleEnemy(all_soldiers);
-		if (enemy && CheckFirePath(x + 0.5, y + 0.5, enemy->getX() + 0.5, enemy->getY() + 0.5, map)) {
+		if (enemy && CheckFirePath(x + 0.5, y + 0.5, enemy->getX() + 0.5, enemy->getY() + 0.5, map, all_soldiers)) {
 			Bullet* b = Shoot(enemy);
 			if (b) {
 				b->setIsMoving(true);
@@ -528,10 +534,7 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 	Point2D targetPos = target->getPosition();
 	Point2D currentPos = getPosition();
 
-	// CRITICAL: If we're on a tree, we MUST find a new position
-	bool mustMove = (map[currentPos.y][currentPos.x] == TREE);
-
-	// --- Safe Vector Setup ---
+	// --- 1. Safe Vector Setup (Crash Fix) ---
 	bool commanderIsValid = false;
 	if (commander) {
 		for (Soldier* s : all_soldiers) {
@@ -541,25 +544,32 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 			}
 		}
 	}
-
 	std::vector<Point2D> dummy_reserved;
 	std::vector<Point2D>* reserved_ptr = &dummy_reserved;
-
 	if (commanderIsValid && commander->IsAlive()) {
 		reserved_ptr = &commander->GetReservedAttackSpots();
 	}
-
 	auto& reserved = *reserved_ptr;
+	// ----------------------------------------
+
+	// --- 2. Lazy Check (Stickiness) ---
+	// If I am in range, have a clear shot, and am NOT overlapping anyone, stay here.
+	double distSq = pow(targetPos.x - currentPos.x, 2) + pow(targetPos.y - currentPos.y, 2);
+	bool amIOverlapping = IsCellOccupied((int)currentPos.x, (int)currentPos.y, all_soldiers);
+
+	if (!amIOverlapping && distSq <= WARRIOR_FIRING_RANGE * WARRIOR_FIRING_RANGE) {
+		if (CheckFirePath(currentPos.x + 0.5, currentPos.y + 0.5, targetPos.x + 0.5, targetPos.y + 0.5, map, all_soldiers)) {
+			return currentPos;
+		}
+	}
 
 	Point2D bestShootingPos = { -1, -1 };
 	double minDistSqToWarrior = 1e9;
-
 	Point2D bestChasePos = { -1, -1 };
 	double minChaseDistSq = 1e9;
 
-	// PHASE 1: Search around CURRENT position (local repositioning)
+	// --- PHASE 1: Search around CURRENT position (Local Repositioning) ---
 	int limit = 8;
-
 	for (int dx = -limit; dx <= limit; ++dx) {
 		for (int dy = -limit; dy <= limit; ++dy) {
 			int xCandidate = currentPos.x + dx;
@@ -570,26 +580,32 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 
 			Point2D candidate = { xCandidate, yCandidate };
 
+			// JITTER FIX: Only check reservation if it's NOT my current spot
 			bool isReserved = false;
-			for (const Point2D& r : reserved) {
-				if (r.x == candidate.x && r.y == candidate.y) {
-					isReserved = true;
-					break;
+			if (!(candidate.x == currentPos.x && candidate.y == currentPos.y)) {
+				for (const Point2D& r : reserved) {
+					if (r.x == candidate.x && r.y == candidate.y) {
+						isReserved = true;
+						break;
+					}
 				}
 			}
 			if (isReserved) continue;
 
+			// CRASH FIX: Pass commander to ignore list
 			if (IsCellOccupied(xCandidate, yCandidate, all_soldiers)) continue;
 
 			double distSqToTarget = pow(xCandidate - targetPos.x, 2) + pow(yCandidate - targetPos.y, 2);
 
+			// Track best chase position (closest to enemy)
 			if (distSqToTarget < minChaseDistSq) {
 				minChaseDistSq = distSqToTarget;
 				bestChasePos = { xCandidate, yCandidate };
 			}
 
+			// Track best shooting position (closest to me, but in range of enemy)
 			if (distSqToTarget <= WARRIOR_FIRING_RANGE * WARRIOR_FIRING_RANGE) {
-				if (CheckFirePath(xCandidate + 0.5, yCandidate + 0.5, targetPos.x + 0.5, targetPos.y + 0.5, map)) {
+				if (CheckFirePath(xCandidate + 0.5, yCandidate + 0.5, targetPos.x + 0.5, targetPos.y + 0.5, map, all_soldiers)) {
 					double distSqToMe = dx * dx + dy * dy;
 					if (distSqToMe < minDistSqToWarrior) {
 						minDistSqToWarrior = distSqToMe;
@@ -604,13 +620,13 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 		reserved.push_back(bestShootingPos);
 		return bestShootingPos;
 	}
-
 	if (bestChasePos.x != -1) {
 		reserved.push_back(bestChasePos);
 		return bestChasePos;
 	}
 
-	// PHASE 2: No local position works - search around the TARGET to flank
+	// --- PHASE 2: Search around TARGET position (Flanking) ---
+	// Used when local area is blocked or bad. We look for spots near the enemy.
 	int flankRadius = (int)WARRIOR_FIRING_RANGE;
 	Point2D bestFlankPos = { -1, -1 };
 	double bestFlankDistSq = 1e9;
@@ -625,21 +641,28 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 
 			Point2D candidate = { xCandidate, yCandidate };
 
+			// JITTER FIX
 			bool isReserved = false;
-			for (const Point2D& r : reserved) {
-				if (r.x == candidate.x && r.y == candidate.y) {
-					isReserved = true;
-					break;
+			if (!(candidate.x == currentPos.x && candidate.y == currentPos.y)) {
+				for (const Point2D& r : reserved) {
+					if (r.x == candidate.x && r.y == candidate.y) {
+						isReserved = true;
+						break;
+					}
 				}
 			}
 			if (isReserved) continue;
 
+			// CRASH FIX
 			if (IsCellOccupied(xCandidate, yCandidate, all_soldiers)) continue;
 
 			double distSqToTarget = dx * dx + dy * dy;
 
+			// Must be in firing range
 			if (distSqToTarget <= WARRIOR_FIRING_RANGE * WARRIOR_FIRING_RANGE) {
-				if (CheckFirePath(xCandidate + 0.5, yCandidate + 0.5, targetPos.x + 0.5, targetPos.y + 0.5, map)) {
+				// Must have clear shot
+				if (CheckFirePath(xCandidate + 0.5, yCandidate + 0.5, targetPos.x + 0.5, targetPos.y + 0.5, map, all_soldiers)) {
+					// Pick the position closest to ME (least travel time)
 					double distSqToMe = pow(xCandidate - currentPos.x, 2) + pow(yCandidate - currentPos.y, 2);
 					if (distSqToMe < bestFlankDistSq) {
 						bestFlankDistSq = distSqToMe;
@@ -655,46 +678,47 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 		return bestFlankPos;
 	}
 
-	// PHASE 3: Complete failure - move toward enemy and hope to find an angle
+	// --- PHASE 3: Complete Failure (Move Toward Enemy) ---
+	// If we can't find ANY shooting spot, just walk towards the enemy.
 	Point2D moveToward = { -1, -1 };
 	double dx = targetPos.x - currentPos.x;
 	double dy = targetPos.y - currentPos.y;
 	double dist = sqrt(dx * dx + dy * dy);
 
 	if (dist > 0) {
+		// Move ~4 units toward the enemy
 		int stepSize = 4;
 		int newX = currentPos.x + (int)((dx / dist) * stepSize);
 		int newY = currentPos.y + (int)((dy / dist) * stepSize);
 
-		newX = std::max(0, std::min(MSZ - 1, newX));
-		newY = std::max(0, std::min(MSZ - 1, newY));
+		// Clamp
+		if (newX < 0) newX = 0; if (newX >= MSZ) newX = MSZ - 1;
+		if (newY < 0) newY = 0; if (newY >= MSZ) newY = MSZ - 1;
 
 		if (map[newY][newX] != STONE && map[newY][newX] != WATER && map[newY][newX] != TREE) {
-			moveToward = { newX, newY };
+			// Check if occupied or reserved
+			bool occupied = IsCellOccupied(newX, newY, all_soldiers);
+			bool reservedSpot = false;
+
+			// JITTER FIX Logic for Phase 3
+			if (!(newX == currentPos.x && newY == currentPos.y)) {
+				for (const Point2D& r : reserved) {
+					if (r.x == newX && r.y == newY) {
+						reservedSpot = true;
+						break;
+					}
+				}
+			}
+
+			if (!occupied && !reservedSpot) {
+				moveToward = { newX, newY };
+			}
 		}
 	}
 
 	if (moveToward.x != -1) {
 		reserved.push_back(moveToward);
 		return moveToward;
-	}
-
-	// LAST RESORT: If we're on a tree and found nothing, move to ANY adjacent non-tree cell
-	if (mustMove) {
-		for (int dx = -1; dx <= 1; dx++) {
-			for (int dy = -1; dy <= 1; dy++) {
-				if (dx == 0 && dy == 0) continue;
-				int nx = currentPos.x + dx;
-				int ny = currentPos.y + dy;
-				if (nx >= 0 && nx < MSZ && ny >= 0 && ny < MSZ) {
-					if (map[ny][nx] != STONE && map[ny][nx] != WATER && map[ny][nx] != TREE) {
-						if (!IsCellOccupied(nx, ny, all_soldiers)) {
-							return { nx, ny };
-						}
-					}
-				}
-			}
-		}
 	}
 
 	return currentPos;

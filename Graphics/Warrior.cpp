@@ -88,9 +88,7 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 	double dy = targetY - startY;
 	double dist = sqrt(dx * dx + dy * dy);
 
-	// 1. ULTRA CLOSE COMBAT
-	// If units are physically touching (dist < 1.0), walls don't matter.
-	// This fixes the bug where standing partially on a tree makes you invincible/unable to shoot.
+	// 1. Point Blank (Overlap)
 	if (dist < 1.0) return true;
 
 	double dirX = dx / dist;
@@ -98,11 +96,9 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 
 	double currX = startX;
 	double currY = startY;
-
-	// Precision step: smaller is better for accuracy, but slower. 0.05 is a good balance.
 	double stepSize = 0.05;
 
-	// Start a little bit away from the center (0.3) to avoid hitting our own cover immediately
+	// Start offset
 	for (double d = 0.3; d < dist; d += stepSize)
 	{
 		currX += dirX * stepSize;
@@ -111,44 +107,39 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 		int gridX = (int)currX;
 		int gridY = (int)currY;
 
-		// Out of bounds check
 		if (gridX < 0 || gridX >= MSZ || gridY < 0 || gridY >= MSZ) return false;
 
-		// --- A. HITBOX CHECK ---
-		// If the bullet is within 0.5 units (radius) of the target center, it's a HIT.
-		// We stop checking walls. This prevents a tree *behind* the target from blocking the shot.
+		// --- HITBOX CHECK ---
+		// If we are touching the enemy (radius 0.5), it's a hit.
 		double distToTarget = sqrt(pow(currX - targetX, 2) + pow(currY - targetY, 2));
 		if (distToTarget < 0.5) return true;
 
-		// --- B. OBSTACLE CHECK ---
-		// Direct center line check
+		// --- OBSTACLE CHECK ---
 		if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE) return false;
 
-		// --- C. THICKNESS CHECK (Corner Grazing) ---
-		// We give the bullet a small physical width (0.15 radius = 0.3 width).
-		// This ensures we don't shoot through impossible diagonal cracks, 
-		// but allows shooting past trees if there is visual space.
-
-		// Only apply width check if we aren't super close to the target (to ensure hits)
+		// --- THICKNESS CHECK ---
+		// FIX: INCREASED MARGIN
+		// Previous: 0.15 (0.3 total width) -> Too thin, clips corners.
+		// New: 0.25 (0.5 total width) -> Safer. If the shot is tight, we say "Blocked" and move.
 		if (distToTarget > 0.8)
 		{
 			double subX = currX - gridX;
 			double subY = currY - gridY;
-			double safetyMargin = 0.15;
+			double safetyMargin = 0.25; // <--- INCREASED THIS
 
-			// Check Right Edge of cell
+			// Check Right
 			if (subX > (1.0 - safetyMargin)) {
 				if (gridX + 1 < MSZ && (map[gridY][gridX + 1] == STONE || map[gridY][gridX + 1] == TREE)) return false;
 			}
-			// Check Left Edge
+			// Check Left
 			else if (subX < safetyMargin) {
 				if (gridX - 1 >= 0 && (map[gridY][gridX - 1] == STONE || map[gridY][gridX - 1] == TREE)) return false;
 			}
-			// Check Bottom Edge
+			// Check Top
 			if (subY > (1.0 - safetyMargin)) {
 				if (gridY + 1 < MSZ && (map[gridY + 1][gridX] == STONE || map[gridY + 1][gridX] == TREE)) return false;
 			}
-			// Check Top Edge
+			// Check Bottom
 			else if (subY < safetyMargin) {
 				if (gridY - 1 >= 0 && (map[gridY - 1][gridX] == STONE || map[gridY - 1][gridX] == TREE)) return false;
 			}

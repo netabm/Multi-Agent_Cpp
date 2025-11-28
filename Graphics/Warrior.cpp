@@ -660,8 +660,8 @@ Point2D Warrior::CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], con
 		int newY = currentPos.y + (int)((dy / dist) * stepSize);
 
 		// Clamp
-		if (newX < 0) newX = 0; if (newX >= MSZ) newX = MSZ - 1;
-		if (newY < 0) newY = 0; if (newY >= MSZ) newY = MSZ - 1;
+		newX = clamp(newX, 0, MSZ - 1);
+		newY = clamp(newY, 0, MSZ - 1);
 
 		if (map[newY][newX] != STONE && map[newY][newX] != WATER && map[newY][newX] != TREE) {
 			bool occupied = IsCellOccupied(newX, newY, all_soldiers);

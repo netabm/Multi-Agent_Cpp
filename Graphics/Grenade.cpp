@@ -1,7 +1,6 @@
 #include "Grenade.h"
 #include "glut.h"
 
-// Constructor now sets up travel
 Grenade::Grenade(double startX, double startY, double targetX, double targetY, Soldier* soldier)
 {
 	shooter = soldier;
@@ -27,7 +26,6 @@ Grenade::Grenade(double startX, double startY, double targetX, double targetY, S
 		travel_dy = 0;
 	}
 
-	// Init bullets to null. They won't be created until explosion.
 	for (int i = 0; i < NUM_BULLETS; i++)
 	{
 		bullets[i] = nullptr;
@@ -44,13 +42,12 @@ Grenade::~Grenade()
 	}
 }
 
-// This function is called internally when the grenade reaches its target
 void Grenade::TriggerExplosion()
 {
 	isTraveling = false;
 	isExploded = true;
 
-	// Now create the shrapnel at the target location (x, y)
+	// Create the bullets at the target location
 	double teta = (360.0 / NUM_BULLETS) * PI / 180.0;
 	for (int i = 0; i < NUM_BULLETS; i++)
 	{
@@ -61,15 +58,14 @@ void Grenade::TriggerExplosion()
 
 }
 
-// This is the new public "explode now" function for debug/mouse
 void Grenade::ExplodeNow()
 {
-	x = target_x; // Instantly move to target
+	x = target_x;
 	y = target_y;
 	TriggerExplosion();
 }
 
-// Update handles travel AND explosion shrapnel
+// Update handles travel and explosion bullets
 void Grenade::Update(int map[MSZ][MSZ])
 {
 	if (isTraveling)
@@ -93,10 +89,10 @@ void Grenade::Update(int map[MSZ][MSZ])
 	}
 	else if (isExploded)
 	{
-		// We are exploded, so update the shrapnel
+		// Update the bullets
 		for (int i = 0; i < NUM_BULLETS; i++)
 		{
-			if (bullets[i]) // Check if bullet exists
+			if (bullets[i]) 
 				bullets[i]->Move(map);
 		}
 	}
@@ -106,7 +102,6 @@ void Grenade::Show()
 {
 	if (isTraveling)
 	{
-		// Draw the grenade itself (a small black square)
 		glColor3d(0.1, 0.1, 0.1);
 		glBegin(GL_POLYGON);
 		glVertex2d(x - 0.2, y - 0.2);
@@ -117,7 +112,6 @@ void Grenade::Show()
 	}
 	else if (isExploded)
 	{
-		// Draw the shrapnel
 		for (int i = 0; i < NUM_BULLETS; i++)
 		{
 			if (bullets[i] && bullets[i]->getIsMoving())

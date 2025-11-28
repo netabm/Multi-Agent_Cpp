@@ -10,7 +10,6 @@ SupportSoldier::SupportSoldier(double start_x, double start_y, int team_id, Comm
 {
 }
 
-// ------------------- Helper -------------------
 void SupportSoldier::ResetToIdle() {
     current_support_state = SUPPORT_IDLE;
     target_patient = nullptr;
@@ -27,7 +26,6 @@ void SupportSoldier::AssignSupportTask(Soldier* patient) {
     isMoving = false;
 }
 
-// ------------------- Update -------------------
 void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers) {
     if (!IsAlive()) {
         ResetToIdle();
@@ -58,7 +56,6 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ], con
     switch (current_support_state) {
     case SUPPORT_MOVING_TO_WAREHOUSE:
         if (isNear(warehouse)) {
-            // Arrived at warehouse
             current_support_state = SUPPORT_MOVING_TO_WARRIOR;
             path.clear();
             isMoving = false;
@@ -85,14 +82,14 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ], con
         }
         break;
 
-    case SUPPORT_RETURNING_HOME:
+    case SUPPORT_RETURNING_TO_WAREHOUSE:
         if (isNear(warehouse)) {
             ResetToIdle();
             break;
         }
         if (!isMoving && path.empty()) {
             SetTarget(warehouse.x, warehouse.y, map, securityMap);
-            if (!isMoving) ResetToIdle(); // Can't reach home
+            if (!isMoving) ResetToIdle(); // Can't reach warehouse
         }
         break;
 
@@ -102,17 +99,15 @@ void SupportSoldier::Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ], con
     }
 }
 
-// ------------------- Return to Warehouse -------------------
 void SupportSoldier::ReturnToWarehouse() {
     if (!IsAlive()) return;
 
-    current_support_state = SUPPORT_RETURNING_HOME;
+    current_support_state = SUPPORT_RETURNING_TO_WAREHOUSE;
     target_patient = nullptr;
     path.clear();
     isMoving = false;
 }
 
-// ------------------- Patrol Logic -------------------
 void SupportSoldier::PatrolRandomly(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]) {
     if (isMoving || !path.empty()) return;
 
@@ -134,7 +129,6 @@ void SupportSoldier::PatrolRandomly(int map[MSZ][MSZ], double securityMap[MSZ][M
         SetTarget(patrol.x, patrol.y, map, securityMap);
 }
 
-// ------------------- Scanning Support -------------------
 void SupportSoldier::HandleScanningSupport(int map[MSZ][MSZ], double securityMap[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers) {
     if (!IsAlive()) return;
     if (current_support_state != SUPPORT_IDLE) return;
@@ -158,7 +152,6 @@ void SupportSoldier::HandleScanningSupport(int map[MSZ][MSZ], double securityMap
     PatrolRandomly(map, securityMap);
 }
 
-// ------------------- Scanning Tasks -------------------
 bool SupportSoldier::ScanAndAssignMedicTasks(const std::vector<Soldier*>& all_soldiers) {
     Soldier* bestLowHP = nullptr;
     Soldier* bestCoverNeed = nullptr;

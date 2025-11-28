@@ -90,13 +90,13 @@ Point2D FindNearestCover(Point2D start, Point2D threat, const std::vector<Point2
         int currentDist = q.front().second;
         q.pop();
 
-        // We can't take cover in our own spot. We must move.
+        // Can't take cover in our own spot
         if (currentDist > 0)
         {
-            // 1. Check if spot has cover from threat
+            // Check if spot has cover from threat
             if (!HasLineOfSight(currentPos.x, currentPos.y, threat.x, threat.y, map))
             {
-                // 2. This spot has cover. NOW, check if it's too close to an "avoid" spot.
+                // Check if it's too close to an "avoid" spot.
                 bool tooCloseToAvoid = false;
                 for (const Point2D& spot : avoid_spots) {
                     // Don't check distance to ourself (the start pos)
@@ -109,15 +109,14 @@ Point2D FindNearestCover(Point2D start, Point2D threat, const std::vector<Point2
                     }
                 }
 
-                // If it's NOT too close, it's our spot!
                 if (!tooCloseToAvoid) {
-                    return currentPos; // This is the NEAREST, SOCIALLY-DISTANCED cover.
+                    return currentPos;
                 }
-                // If it was too close, we don't return. The BFS continues.
+                // If it was too close, don't return. The BFS continues.
             }
         }
 
-        // 3. If not safe, or too close, or start tile:
+        // If not safe, or too close, or start tile
         // Check if we are still within search range
         if (currentDist < MAX_SEARCH_RANGE)
         {

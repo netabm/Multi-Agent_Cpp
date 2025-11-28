@@ -20,15 +20,13 @@ void Commander::Show()
 
 	if (team == 0)
 	{
-		// purple/magenta
-		glColor3d(0.8, 0.2, 0.8);
+		glColor3d(0.8, 0.2, 0.8); // Purple
 	}
 	else
 	{
 		glColor3d(1.0, 0.5, 0.0); // Orange
 	}
 
-	// Draw the 1x1 square
 	glBegin(GL_POLYGON);
 	glVertex2d(x, y);
 	glVertex2d(x, y + 1);
@@ -37,7 +35,7 @@ void Commander::Show()
 	glEnd();
 
 	// Set the color for the text
-	glColor3d(0, 0, 0); // Black
+	glColor3d(0, 0, 0);
 
 	glRasterPos2d(x + 0.1, y + 0.1);
 
@@ -88,7 +86,7 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 {
 	if (!isAlive) return;
 
-	// 1. Find an available Medic
+	// Find an available Medic
 	Medic* availableMedic = nullptr;
 	for (Soldier* s : team_soldiers) {
 		Medic* m = dynamic_cast<Medic*>(s);
@@ -99,11 +97,10 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 	}
 	if (!availableMedic) return;
 
-	// Change these from Warrior* to Soldier* so they can store any unit type
 	Soldier* bestLowHP = nullptr;
 	Soldier* bestCoverNeed = nullptr;
 
-	// 2. Scan ALL soldiers (Commander, Warriors, Supply, etc.)
+	// Scan all soldiers
 	for (Soldier* s : team_soldiers)
 	{
 		if (!s || !s->IsAlive()) continue;
@@ -111,14 +108,13 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 		if (s == availableMedic) continue;
 		int hp = s->getHealth();
 
-		// Priority 1: CRITICAL HP (Any Unit Type)
+		// Priority 1: low HP
 		if (hp <= 25) {
 			if (!bestLowHP || hp < bestLowHP->getHealth())
 				bestLowHP = s;
 		}
 
 		// Priority 2: Warriors specifically finding cover
-		// We try to cast to Warrior just for this specific check
 		Warrior* w = dynamic_cast<Warrior*>(s);
 		if (w) {
 			int state = w->getCurrentInternalState();
@@ -128,15 +124,15 @@ void Commander::CheckHealth(const std::vector<Soldier*>& team_soldiers,
 			}
 		}
 	}
-	// 3. Assign task by priority
+	// Assign task by priority
 
-	// Priority A: Someone is about to die (Commander, Warrior, or Supply)
+	// Priority 1: Someone is about to die
 	if (bestLowHP) {
 		availableMedic->AssignSupportTask(bestLowHP);
 		return;
 	}
 
-	// Priority B: A Warrior is pinned down and finding cover
+	// Priority 2: Warrior is finding cover
 	if (bestCoverNeed) {
 		availableMedic->AssignSupportTask(bestCoverNeed);
 		return;
@@ -225,7 +221,7 @@ void Commander::Update(const std::vector<Soldier*>& team_soldiers, const std::ve
 		targetLocation = { (int)avgX, (int)avgY };
 
 		// Broadcast with Spam Protection
-		// Check if command changed OR if target moved significantly (prevent jitter)
+		// Check if command changed OR if target moved significantly
 		bool commandChanged = (currentCommand != previousCommand);
 		bool targetMoved = (abs(previousTarget.x - targetLocation.x) > 2 || abs(previousTarget.y - targetLocation.y) > 2);
 

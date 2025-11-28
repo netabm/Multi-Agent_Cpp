@@ -1,6 +1,5 @@
 #include "Visibility.h"
 
-// Helper function: Traces a single line of sight
 void BresenhamLine(int x1, int y1, int x2, int y2, int map[MSZ][MSZ], bool visible[MSZ][MSZ])
 {
     int dx = abs(x2 - x1), dy = abs(y2 - y1);
@@ -23,7 +22,6 @@ void BresenhamLine(int x1, int y1, int x2, int y2, int map[MSZ][MSZ], bool visib
     }
 }
 
-// Main function to calculate a soldier's complete field of view
 void CalculateVisibility(Soldier* soldier, int map[MSZ][MSZ], bool visible[MSZ][MSZ])
 {
     // Reset map
@@ -33,10 +31,10 @@ void CalculateVisibility(Soldier* soldier, int map[MSZ][MSZ], bool visible[MSZ][
 
     // Trace lines from the soldier to every cell on the map's perimeter
     for (int i = 0; i < MSZ; i++) {
-        BresenhamLine(pos.x, pos.y, i, 0, map, visible);         // Top edge
-        BresenhamLine(pos.x, pos.y, i, MSZ - 1, map, visible); // Bottom edge
-        BresenhamLine(pos.x, pos.y, 0, i, map, visible);         // Left edge
-        BresenhamLine(pos.x, pos.y, MSZ - 1, i, map, visible); // Right edge
+        BresenhamLine(pos.x, pos.y, i, 0, map, visible);
+        BresenhamLine(pos.x, pos.y, i, MSZ - 1, map, visible);
+        BresenhamLine(pos.x, pos.y, 0, i, map, visible);
+        BresenhamLine(pos.x, pos.y, MSZ - 1, i, map, visible);
     }
 }
 
@@ -64,8 +62,6 @@ void CalculateTeamVisibility(const std::vector<Soldier*>& soldiers, int team_id,
     }
 }
 
-
-// Checks if there's a clear line of sight between two points
 bool HasLineOfSight(int x1, int y1, int x2, int y2, int map[MSZ][MSZ])
 {
     if (x1 < 0 || x1 >= MSZ || y1 < 0 || y1 >= MSZ || x2 < 0 || x2 >= MSZ || y2 < 0 || y2 >= MSZ) {
@@ -83,12 +79,11 @@ bool HasLineOfSight(int x1, int y1, int x2, int y2, int map[MSZ][MSZ])
     int currentY = y1;
 
     while (true) {
-        // Stop check just before reaching the target cell
         if (currentX == x2 && currentY == y2) {
             break;
         }
 
-        // Check the *next* potential step based on Bresenham's error term
+        // Check the next potential step based on Bresenham's error term
         int e2 = 2 * err;
         int nextX = currentX;
         int nextY = currentY;
@@ -104,13 +99,13 @@ bool HasLineOfSight(int x1, int y1, int x2, int y2, int map[MSZ][MSZ])
 
         // Check if the calculated next step is valid before checking map
         if (nextX < 0 || nextX >= MSZ || nextY < 0 || nextY >= MSZ) {
-            return false; // Line went off-map during calculation
+            return false;
         }
 
-        // Check if the intermediate cell (nextX, nextY) blocks LoS
+        // Check if the intermediate cell blocks LoS
         // If the intermediate cell is the target, don't check it as blocking
         if (!(nextX == x2 && nextY == y2) && (map[nextY][nextX] == STONE || map[nextY][nextX] == TREE)) {
-            return false; // Path blocked
+            return false; 
         }
 
         // Move to the next cell

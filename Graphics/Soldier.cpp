@@ -21,8 +21,8 @@ Soldier::Soldier(double start_x, double start_y, int team_id) {
 void Soldier::Show() {
 	if (!isAlive) return;
 
-	// --- Draw Soldier ---
-	glColor3d(0.2, 0.2, 0.8); // Example soldier color
+	// Draw Soldier
+	glColor3d(0.2, 0.2, 0.8);
 	glBegin(GL_POLYGON);
 	glVertex2d(x, y);
 	glVertex2d(x + 1.0, y);
@@ -30,15 +30,15 @@ void Soldier::Show() {
 	glVertex2d(x, y + 1.0);
 	glEnd();
 
-	// --- Draw Health Bar ---
-	double healthPercentage = (double)health / 100.0; // Assuming max health is 100
+	// Draw Health Bar
+	double healthPercentage = (double)health / 100.0;
 	if (healthPercentage < 0) healthPercentage = 0;
 
-	double barY = y + 1.2;       // Slightly above the soldier
+	double barY = y + 1.2; 
 	double barHeight = 0.15;
-	double barWidth = 1.0;       // Same width as soldier square
+	double barWidth = 1.0; 
 
-	// Background (dark red)
+	// Background
 	glColor3d(0.5, 0.1, 0.1);
 	glBegin(GL_POLYGON);
 	glVertex2d(x , barY);
@@ -47,7 +47,7 @@ void Soldier::Show() {
 	glVertex2d(x, barY + barHeight);
 	glEnd();
 
-	// Foreground (green) proportional to health
+	// Foreground
 	glColor3d(0.1, 0.8, 0.1);
 	glBegin(GL_POLYGON);
 	glVertex2d(x, barY);
@@ -56,10 +56,10 @@ void Soldier::Show() {
 	glVertex2d(x, barY + barHeight);
 	glEnd();
 
-	// --- Draw Numerical Health ---
-	glColor3d(0, 0, 0); // Black text
+	// Draw Numerical Health
+	glColor3d(0, 0, 0);
 	std::string healthText = std::to_string(health);
-	glRasterPos2d(x, barY + barHeight + 0.1); // Slightly above the bar
+	glRasterPos2d(x, barY + barHeight + 0.1);
 	for (char c : healthText) {
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c);
 	}
@@ -100,13 +100,13 @@ void Soldier::Move(int map[MSZ][MSZ]) {
 
 	// Check if already at destination
 	if (sqrt(pow(dest_x - x, 2) + pow(dest_y - y, 2)) < SPEED * 0.5) {
-		x = dest_x;  // Snap to exact position
+		x = dest_x; 
 		y = dest_y;
 		path.pop_back();
 		if (path.empty()) {
 			isMoving = false;
 		}
-		return;  // Important: return after reaching waypoint
+		return;
 	}
 
 	double dirX = dest_x - x;

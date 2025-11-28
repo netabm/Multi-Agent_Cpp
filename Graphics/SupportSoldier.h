@@ -15,8 +15,8 @@ protected:
     Soldier* target_patient = nullptr; // Soldier to supply/heal
 	Commander* commander = nullptr; // Assigned commander
 
-    virtual Point2D GetWarehousePosition() const = 0; // Pure virtual: supply/medic warehouse
-    virtual void ApplyEffect(Soldier* patient) = 0;   // Pure virtual: ammo/heal/etc
+    virtual Point2D GetWarehousePosition() const = 0; // virtual supply/medic warehouse
+    virtual void ApplyEffect(Soldier* patient) = 0;   // virtual ammo/heal/etc
 
 public:
     SupportSoldier(double start_x, double start_y, int team_id, Commander* cmd);

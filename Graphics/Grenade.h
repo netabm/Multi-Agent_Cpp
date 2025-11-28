@@ -8,28 +8,25 @@ class Grenade
 {
 private:
 	Bullet* bullets[NUM_BULLETS];
-	double x, y; // CURRENT position (while traveling)
-	double target_x, target_y; // Where it's going
+	double x, y; // current position
+	double target_x, target_y;
 
 	bool isTraveling;
 	bool isExploded;
 	Soldier* shooter;
 
-	double travel_dx; // Pre-calculated travel vector
+	double travel_dx; // travel vector
 	double travel_dy;
 
 	// Private helper to create the explosion
 	void TriggerExplosion();
 
 public:
-	// Constructor now takes start AND target positions
 	Grenade(double startX, double startY, double targetX, double targetY, Soldier* soldier);
 	~Grenade(); // Destructor to clean up bullets
 
-	// Renamed from Explode to Update, as it now handles travel
 	void Update(int map[MSZ][MSZ]);
 
-	// This is for debug (like your mouse click) to make it explode instantly
 	void ExplodeNow();
 
 	Soldier* getShooter() { return shooter; }

@@ -21,7 +21,7 @@ public:
 
     void AssignSupportTask(Soldier* patient);
 
-    virtual void Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
+    void Update(int map[MSZ][MSZ], double securityMap[MSZ][MSZ]);
 
     SupportState getSupportState() const { return current_support_state;}
 

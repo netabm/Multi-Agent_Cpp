@@ -24,4 +24,11 @@ struct Point2D {
 	}
 };
 
+inline int clamp(int value, int minVal, int maxVal) {
+	if (value < minVal) return minVal;
+	if (value > maxVal) return maxVal;
+	return value;
+}
+
+
 

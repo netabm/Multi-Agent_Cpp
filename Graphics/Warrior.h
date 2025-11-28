@@ -59,8 +59,7 @@ public:
 
 	Point2D CalculateAttackPosition(Soldier* target, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);
 	Soldier* FindClosestVisibleEnemy(const std::vector<Soldier*>& all_soldiers);
-	bool CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ]);
-	bool IsCellOccupied(int x, int y, const std::vector<Soldier*>& all_soldiers);
+	bool CheckFirePath(double startX, double startY, double targetX, double targetY, int map[MSZ][MSZ], const std::vector<Soldier*>& all_soldiers);	bool IsCellOccupied(int x, int y, const std::vector<Soldier*>& all_soldiers);
 
 
 	void SetCommand(CommandType cmd, Point2D location);

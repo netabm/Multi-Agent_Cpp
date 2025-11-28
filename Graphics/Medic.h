@@ -4,7 +4,7 @@
 
 class Medic : public SupportSoldier {
 public:
-    Medic(double x, double y, int team_id) : SupportSoldier(x, y, team_id) {}
+    Medic(double x, double y, int team_id, Commander* cmd) : SupportSoldier(x, y, team_id, cmd) {}
 
 protected:
 	void Show();

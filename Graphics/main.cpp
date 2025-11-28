@@ -217,30 +217,16 @@ void init()
 
 	soldiers.push_back(new Warrior(4, 8, 0, c0));
 	soldiers.push_back(new Warrior(8, 4, 0, c0));
-	soldiers.push_back(new SupplySoldier(12, 6, 0));
-	soldiers.push_back(new Medic(6, 12, 0));
+	soldiers.push_back(new SupplySoldier(12, 6, 0, c0));
+	soldiers.push_back(new Medic(6, 12, 0, c0));
 
 	// Team 1 (top-right region) - spread out
 	soldiers.push_back(new Commander(43, 43, 1));
 	c1 = dynamic_cast<Commander*>(soldiers.back());
 	soldiers.push_back(new Warrior(41, 45, 1, c1));
 	soldiers.push_back(new Warrior(45, 41, 1, c1));
-	soldiers.push_back(new SupplySoldier(44, 38, 1));
-	soldiers.push_back(new Medic(38, 44, 1));
-}
-
-void CreateSecurityMap()
-{
-	int num_grenades = 10;
-	int i;
-
-	for (i = 0;i < num_grenades;i++)
-	{
-		//pg = new Grenade(MSZ / 2 - 10 + rand() % 20, MSZ / 2 - 10 + rand() % 20);
-		//pg->UpdateSecurityMap(map, securityMap);
-		// Keep grenade to show explosion/security visualization if desired
-		//active_grenades.push_back(pg);
-	}
+	soldiers.push_back(new SupplySoldier(44, 38, 1, c1));
+	soldiers.push_back(new Medic(38, 44, 1, c1));
 }
 
 void DrawTree(int x, int y)
@@ -536,7 +522,7 @@ void idle()
 			w->Update(soldiers, active_bullets, active_grenades, map, securityMap);
 		}
 		else if (SupportSoldier* sp = dynamic_cast<SupportSoldier*>(s)) {
-			sp->Update(map, securityMap);
+			sp->Update(map, securityMap, soldiers);
 		}
 	}
 
@@ -678,20 +664,16 @@ void menu(int choice)
 	switch (choice)
 	{
 	case 1:
-		CreateSecurityMap();
-		break;
-	case 2:
 		glutDisplayFunc(displaySecurityMap);
 		break;
-	case 3:
+	case 2:
 		glutDisplayFunc(display);
 		break;
-	case 4: // Show Team 1 visibility map
+	case 3: // Show Team 1 visibility map
 		teamToShow = 0;
 		glutDisplayFunc(displayTeamVisibility);
 		break;
-
-	case 5: // Show Team 2 visibility map
+	case 4: // Show Team 2 visibility map
 		teamToShow = 1;
 		glutDisplayFunc(displayTeamVisibility);
 		break;
@@ -713,11 +695,10 @@ int main(int argc, char* argv[])
 
 	// add menu
 	glutCreateMenu(menu);
-	glutAddMenuEntry("Create Security Map", 1);
-	glutAddMenuEntry("Show Security Map", 2);
-	glutAddMenuEntry("Show Regular Map", 3);
-	glutAddMenuEntry("Show Team 1 Visibility", 4);
-	glutAddMenuEntry("Show Team 2 Visibility", 5);
+	glutAddMenuEntry("Show Security Map", 1);
+	glutAddMenuEntry("Show Regular Map", 2);
+	glutAddMenuEntry("Show Team 1 Visibility", 3);
+	glutAddMenuEntry("Show Team 2 Visibility", 4);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 
 	init();

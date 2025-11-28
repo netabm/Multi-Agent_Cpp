@@ -98,8 +98,10 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 	double currY = startY;
 	double stepSize = 0.05;
 
-	// Start offset
-	for (double d = 0.0; d < dist; d += stepSize)
+	// FIX 1: Start Offset
+	// Start d at 0.3. If we start at 0.0, the "Thickness Check" might hit
+	// the wall/tree we are hiding behind and tell us we can't shoot.
+	for (double d = 0.3; d < dist; d += stepSize)
 	{
 		currX += dirX * stepSize;
 		currY += dirY * stepSize;
@@ -107,50 +109,39 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 		int gridX = (int)currX;
 		int gridY = (int)currY;
 
+		// Out of bounds
 		if (gridX < 0 || gridX >= MSZ || gridY < 0 || gridY >= MSZ) return false;
 
-		// --- HITBOX CHECK (Target) ---
+		// --- HITBOX CHECK ---
+		// If we touch the enemy (radius 0.5), it is a hit. Stop checking walls.
 		double distToTarget = sqrt(pow(currX - targetX, 2) + pow(currY - targetY, 2));
 		if (distToTarget < 0.5) return true;
 
-		// --- NEW: FRIENDLY FIRE CHECK ---
-		// Check if this bullet point hits any teammate
+		// --- FRIENDLY FIRE CHECK ---
 		for (Soldier* s : all_soldiers) {
-			// Skip self, skip dead, skip enemies (we want to hit enemies)
 			if (s == this || !s->IsAlive() || s->getTeam() != this->team) continue;
-
-			// Calculate distance from bullet to teammate
 			double distToAlly = sqrt(pow(currX - s->getX(), 2) + pow(currY - s->getY(), 2));
-
-			// If bullet touches teammate (radius 0.5), BLOCK THE SHOT
-			if (distToAlly < 0.5) {
-				return false;
-			}
+			if (distToAlly < 0.5) return false; // Blocked by teammate
 		}
-		// -------------------------------
 
 		// --- OBSTACLE CHECK ---
 		if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE) return false;
 
-		// --- THICKNESS CHECK ---
-		if (distToTarget > 0.8)
-		{
-			double subX = currX - gridX;
-			double subY = currY - gridY;
-			double safetyMargin = 0.25;
+		double subX = currX - gridX;
+		double subY = currY - gridY;
+		double safetyMargin = 0.25; // 0.25 margin = 0.5 tile width clearance
 
-			if (subX > (1.0 - safetyMargin)) {
-				if (gridX + 1 < MSZ && (map[gridY][gridX + 1] == STONE || map[gridY][gridX + 1] == TREE)) return false;
-			}
-			else if (subX < safetyMargin) {
-				if (gridX - 1 >= 0 && (map[gridY][gridX - 1] == STONE || map[gridY][gridX - 1] == TREE)) return false;
-			}
-			if (subY > (1.0 - safetyMargin)) {
-				if (gridY + 1 < MSZ && (map[gridY + 1][gridX] == STONE || map[gridY + 1][gridX] == TREE)) return false;
-			}
-			else if (subY < safetyMargin) {
-				if (gridY - 1 >= 0 && (map[gridY - 1][gridX] == STONE || map[gridY - 1][gridX] == TREE)) return false;
-			}
+		if (subX > (1.0 - safetyMargin)) {
+			if (gridX + 1 < MSZ && (map[gridY][gridX + 1] == STONE || map[gridY][gridX + 1] == TREE)) return false;
+		}
+		else if (subX < safetyMargin) {
+			if (gridX - 1 >= 0 && (map[gridY][gridX - 1] == STONE || map[gridY][gridX - 1] == TREE)) return false;
+		}
+		if (subY > (1.0 - safetyMargin)) {
+			if (gridY + 1 < MSZ && (map[gridY + 1][gridX] == STONE || map[gridY + 1][gridX] == TREE)) return false;
+		}
+		else if (subY < safetyMargin) {
+			if (gridY - 1 >= 0 && (map[gridY - 1][gridX] == STONE || map[gridY - 1][gridX] == TREE)) return false;
 		}
 	}
 

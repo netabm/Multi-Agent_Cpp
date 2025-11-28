@@ -4,7 +4,7 @@
 
 class SupplySoldier : public SupportSoldier {
 public:
-    SupplySoldier(double x, double y, int team_id) : SupportSoldier(x, y, team_id) {}
+    SupplySoldier(double x, double y, int team_id, Commander* cmd) : SupportSoldier(x, y, team_id, cmd) {}
 
 protected:
     void Show();

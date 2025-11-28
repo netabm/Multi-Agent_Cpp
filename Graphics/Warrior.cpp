@@ -88,62 +88,69 @@ bool Warrior::CheckFirePath(double startX, double startY, double targetX, double
 	double dy = targetY - startY;
 	double dist = sqrt(dx * dx + dy * dy);
 
-	// 1. Point Blank (Overlap)
-	if (dist < 1.0) return true;
+	// FIX 1: Tighten "Point Blank". 1.0 is too large (allows shooting through adjacent walls).
+	// 0.0 means we only skip if we are literally on top of them.
+	if (dist < 0.1) return true;
 
+	// Normalize direction
 	double dirX = dx / dist;
 	double dirY = dy / dist;
 
-	double currX = startX;
-	double currY = startY;
-	double stepSize = 0.05;
+	// Calculate Perpendicular Vector for width (Right Vector)
+	// If Forward is (x, y), Right is (-y, x)
+	double perpX = -dirY;
+	double perpY = dirX;
 
-	// FIX 1: Start Offset
-	// Start d at 0.3. If we start at 0.0, the "Thickness Check" might hit
-	// the wall/tree we are hiding behind and tell us we can't shoot.
-	for (double d = 0.3; d < dist; d += stepSize)
-	{
-		currX += dirX * stepSize;
-		currY += dirY * stepSize;
+	// Bullet Radius / Clearance width
+	double radius = 0.25;
 
-		int gridX = (int)currX;
-		int gridY = (int)currY;
+	// Define a Lambda to handle the actual Ray Marching to keep code clean
+	auto IsRayClear = [&](double sx, double sy, double ex, double ey) -> bool {
+		double rdx = ex - sx;
+		double rdy = ey - sy;
+		double rDist = sqrt(rdx * rdx + rdy * rdy);
+		double rDirX = rdx / rDist;
+		double rDirY = rdy / rDist;
 
-		// Out of bounds
-		if (gridX < 0 || gridX >= MSZ || gridY < 0 || gridY >= MSZ) return false;
+		double currX = sx;
+		double currY = sy;
 
-		// --- HITBOX CHECK ---
-		// If we touch the enemy (radius 0.5), it is a hit. Stop checking walls.
-		double distToTarget = sqrt(pow(currX - targetX, 2) + pow(currY - targetY, 2));
-		if (distToTarget < 0.5) return true;
+		// Iterate. Start slightly forward to avoid hitting own hitbox if offset
+		for (double d = 0.0; d < rDist; d += 0.1)
+		{
+			int gridX = (int)currX;
+			int gridY = (int)currY;
 
-		// --- FRIENDLY FIRE CHECK ---
-		for (Soldier* s : all_soldiers) {
-			if (s == this || !s->IsAlive() || s->getTeam() != this->team) continue;
-			double distToAlly = sqrt(pow(currX - s->getX(), 2) + pow(currY - s->getY(), 2));
-			if (distToAlly < 0.5) return false; // Blocked by teammate
+			// Out of bounds
+			if (gridX < 0 || gridX >= MSZ || gridY < 0 || gridY >= MSZ) return false;
+
+			// --- OBSTACLE CHECK ---
+			if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE) return false;
+
+			// --- FRIENDLY FIRE CHECK ---
+			// Note: We check this on the main ray usually, but checking on all is safer
+			for (Soldier* s : all_soldiers) {
+				if (s == this || !s->IsAlive() || s->getTeam() != this->team) continue;
+				// Simple circle check against the point on the ray
+				if (pow(currX - s->getX() - 0.5, 2) + pow(currY - s->getY() - 0.5, 2) < 0.25) return false;
+			}
+
+			currX += rDirX * 0.05;
+			currY += rDirY * 0.05;
 		}
+		return true;
+		};
 
-		// --- OBSTACLE CHECK ---
-		if (map[gridY][gridX] == STONE || map[gridY][gridX] == TREE) return false;
+	// 1. Check Center Ray
+	if (!IsRayClear(startX, startY, targetX, targetY)) return false;
 
-		double subX = currX - gridX;
-		double subY = currY - gridY;
-		double safetyMargin = 0.25; // 0.25 margin = 0.5 tile width clearance
+	// 2. Check Left Wing (Offset by radius)
+	if (!IsRayClear(startX + perpX * radius, startY + perpY * radius,
+		targetX + perpX * radius, targetY + perpY * radius)) return false;
 
-		if (subX > (1.0 - safetyMargin)) {
-			if (gridX + 1 < MSZ && (map[gridY][gridX + 1] == STONE || map[gridY][gridX + 1] == TREE)) return false;
-		}
-		else if (subX < safetyMargin) {
-			if (gridX - 1 >= 0 && (map[gridY][gridX - 1] == STONE || map[gridY][gridX - 1] == TREE)) return false;
-		}
-		if (subY > (1.0 - safetyMargin)) {
-			if (gridY + 1 < MSZ && (map[gridY + 1][gridX] == STONE || map[gridY + 1][gridX] == TREE)) return false;
-		}
-		else if (subY < safetyMargin) {
-			if (gridY - 1 >= 0 && (map[gridY - 1][gridX] == STONE || map[gridY - 1][gridX] == TREE)) return false;
-		}
-	}
+	// 3. Check Right Wing (Offset by radius)
+	if (!IsRayClear(startX - perpX * radius, startY - perpY * radius,
+		targetX - perpX * radius, targetY - perpY * radius)) return false;
 
 	return true;
 }

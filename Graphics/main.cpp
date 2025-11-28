@@ -12,6 +12,9 @@
 const int W = 600;
 const int H = 600; // window sizes
 int teamToShow = -1; // -1 = no team, 0 = team 0, 1 = team 1
+bool gameOver = false;
+int winningTeam = -1; // -1 = no winner yet
+
 
 int map[MSZ][MSZ] = { 0 };
 double securityMap[MSZ][MSZ] = { 0 };
@@ -352,6 +355,45 @@ void display()
 		g->Show();
 	}
 
+	if (gameOver)
+	{
+		const char* msg = winningTeam == 0 ? "TEAM 0 WINS!" : "TEAM 1 WINS!";
+
+		float textLength = glutStrokeLength(GLUT_STROKE_ROMAN, (unsigned char*)msg);
+
+		glPushMatrix();
+
+		glTranslated(MSZ / 2.0, MSZ / 2.0, 0);
+
+
+		float scaleFactor = (MSZ * 0.8) / textLength;
+		glScaled(scaleFactor, scaleFactor, 1.0);
+
+		glTranslated(-textLength / 2.0, -60.0, 0);
+
+		// --- DRAWING ---
+
+		glColor3d(0.0, 0.0, 0.0);
+		glLineWidth(4.0); // Make the shadow thick
+
+		glPushMatrix();
+		glTranslated(10.0, -10.0, 0); // Shift shadow right-down
+		for (const char* c = msg; *c; c++)
+			glutStrokeCharacter(GLUT_STROKE_ROMAN, *c);
+		glPopMatrix();
+
+		// B. Draw Main Text (Red)
+		glColor3d(1.0, 0.0, 0.0); // Pure Red
+		glLineWidth(3.0); // Make the main text thick, but slightly thinner than shadow
+
+		for (const char* c = msg; *c; c++)
+			glutStrokeCharacter(GLUT_STROKE_ROMAN, *c);
+
+		// --- CLEANUP ---
+		glLineWidth(1.0); // Reset line width for next frame
+		glPopMatrix();    // Restore matrix
+	}
+
 	glutSwapBuffers(); // show all
 }
 
@@ -504,141 +546,143 @@ void displayTeamVisibility()
 	glutSwapBuffers();
 }
 
+void CheckVictory()
+{
+	if (gameOver) return;
+
+	bool team0Alive = false;
+	bool team1Alive = false;
+
+	// Check who is alive...
+	for (Soldier* s : soldiers)
+	{
+		if (!s->IsAlive()) continue;
+		if (s->getTeam() == 0) team0Alive = true;
+		if (s->getTeam() == 1) team1Alive = true;
+	}
+
+	if (!team0Alive) { gameOver = true; winningTeam = 1; }
+	else if (!team1Alive) { gameOver = true; winningTeam = 0; }
+
+	if (gameOver)
+	{
+		printf("Team %d Wins!\n", winningTeam);
+	}
+}
+
+
 void idle()
 {
-	// Update commanders
-	for (Soldier* s : soldiers) {
-		Commander* cmd = dynamic_cast<Commander*>(s);
-		if (cmd && cmd->IsAlive()) {
-			auto team = GetTeamSoldiers(cmd->getTeam());
-			cmd->Update(team, soldiers, map, securityMap);
-		}
-	}
-
-	// Update soldiers
-	for (Soldier* s : soldiers) {
-		Warrior* w = dynamic_cast<Warrior*>(s);
-		if (w && w->IsAlive()) {
-			w->Update(soldiers, active_bullets, active_grenades, map, securityMap);
-		}
-		else if (SupportSoldier* sp = dynamic_cast<SupportSoldier*>(s)) {
-			sp->Update(map, securityMap, soldiers);
-		}
-	}
-
-	for (Soldier* s : soldiers) {
-		if (s->IsAlive()) {
-			s->Move(map);
-		}
-	}
-	// Update projectiles and grenades
-	for (Grenade* g : active_grenades) {
-		g->Update(map);
-	}
-	for (Bullet* b : active_bullets) {
-		b->Move(map);
-	}
-
-	// Collision: bullets -> soldiers
-	for (Bullet* bullet : active_bullets) {
-		if (bullet->getIsMoving()) {
-			bullet->UpdateSecurityMap(map, securityMap);
-			for (Soldier* soldier : soldiers) {
-				if (soldier != bullet->getShooter() && soldier->IsAlive()) {
-					double soldier_posX = soldier->getX();
-					double soldier_posY = soldier->getY();
-					double bullet_posX = bullet->getX();
-					double bullet_posY = bullet->getY();
-
-					if (bullet_posX >= soldier_posX && bullet_posX < soldier_posX + 1 && bullet_posY >= soldier_posY && bullet_posY < soldier_posY + 1) {
-						soldier->TakeDamage();
-						bullet->setIsMoving(false);
-						break;
-					}
-				}
+	if (!gameOver) {
+		// Update commanders
+		for (Soldier* s : soldiers) {
+			Commander* cmd = dynamic_cast<Commander*>(s);
+			if (cmd && cmd->IsAlive()) {
+				auto team = GetTeamSoldiers(cmd->getTeam());
+				cmd->Update(team, soldiers, map, securityMap);
 			}
 		}
-	}
 
-	// Collision: grenade bullets -> soldiers
-	for (Grenade* grenade : active_grenades) {
-		Bullet** bullets_from_grenade = grenade->getBullets();
-		for (int i = 0; i < NUM_BULLETS; i++) {
-			// Must check if the bullet pointer is valid *before* trying to use it.
-			if (bullets_from_grenade[i] && bullets_from_grenade[i]->getIsMoving()) {
-				bullets_from_grenade[i]->UpdateSecurityMap(map, securityMap);
+		// Update soldiers
+		for (Soldier* s : soldiers) {
+			Warrior* w = dynamic_cast<Warrior*>(s);
+			if (w && w->IsAlive()) {
+				w->Update(soldiers, active_bullets, active_grenades, map, securityMap);
+			}
+			else if (SupportSoldier* sp = dynamic_cast<SupportSoldier*>(s)) {
+				sp->Update(map, securityMap, soldiers);
+			}
+		}
+
+		for (Soldier* s : soldiers) {
+			if (s->IsAlive()) {
+				s->Move(map);
+			}
+		}
+		// Update projectiles and grenades
+		for (Grenade* g : active_grenades) {
+			g->Update(map);
+		}
+		for (Bullet* b : active_bullets) {
+			b->Move(map);
+		}
+
+		// Collision: bullets -> soldiers
+		for (Bullet* bullet : active_bullets) {
+			if (bullet->getIsMoving()) {
+				bullet->UpdateSecurityMap(map, securityMap);
 				for (Soldier* soldier : soldiers) {
-					if (soldier->IsAlive()) {
+					if (soldier != bullet->getShooter() && soldier->IsAlive()) {
 						double soldier_posX = soldier->getX();
 						double soldier_posY = soldier->getY();
-						double bullet_posX = bullets_from_grenade[i]->getX();
-						double bullet_posY = bullets_from_grenade[i]->getY();
+						double bullet_posX = bullet->getX();
+						double bullet_posY = bullet->getY();
 
 						if (bullet_posX >= soldier_posX && bullet_posX < soldier_posX + 1 && bullet_posY >= soldier_posY && bullet_posY < soldier_posY + 1) {
 							soldier->TakeDamage();
-							bullets_from_grenade[i]->setIsMoving(false);
+							bullet->setIsMoving(false);
 							break;
 						}
 					}
 				}
 			}
 		}
+
+		// Collision: grenade bullets -> soldiers
+		for (Grenade* grenade : active_grenades) {
+			Bullet** bullets_from_grenade = grenade->getBullets();
+			for (int i = 0; i < NUM_BULLETS; i++) {
+				// Must check if the bullet pointer is valid *before* trying to use it.
+				if (bullets_from_grenade[i] && bullets_from_grenade[i]->getIsMoving()) {
+					bullets_from_grenade[i]->UpdateSecurityMap(map, securityMap);
+					for (Soldier* soldier : soldiers) {
+						if (soldier->IsAlive()) {
+							double soldier_posX = soldier->getX();
+							double soldier_posY = soldier->getY();
+							double bullet_posX = bullets_from_grenade[i]->getX();
+							double bullet_posY = bullets_from_grenade[i]->getY();
+
+							if (bullet_posX >= soldier_posX && bullet_posX < soldier_posX + 1 && bullet_posY >= soldier_posY && bullet_posY < soldier_posY + 1) {
+								soldier->TakeDamage();
+								bullets_from_grenade[i]->setIsMoving(false);
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Decay security map values
+		for (int i = 0; i < MSZ; i++)
+			for (int j = 0; j < MSZ; j++)
+				securityMap[i][j] *= 0.9999;
+
+		// Remove stopped bullets
+		active_bullets.erase(std::remove_if(active_bullets.begin(), active_bullets.end(),
+			[](Bullet* b) {
+				if (!b->getIsMoving()) {
+					delete b; // Free memory
+					return true;
+				}
+				return false;
+			}), active_bullets.end());
+
+		// Remove dead soldiers
+		soldiers.erase(std::remove_if(soldiers.begin(), soldiers.end(),
+			[](Soldier* s) {
+				if (!s->IsAlive()) {
+					delete s; // Free memory
+					return true;
+				}
+				return false;
+			}), soldiers.end());
+
+
+		CheckVictory();
 	}
-
-	// Decay security map values
-	for (int i = 0; i < MSZ; i++)
-		for (int j = 0; j < MSZ; j++)
-			securityMap[i][j] *= 0.9999;
-
-	// Remove stopped bullets
-	active_bullets.erase(std::remove_if(active_bullets.begin(), active_bullets.end(),
-		[](Bullet* b) {
-			if (!b->getIsMoving()) {
-				delete b; // Free memory
-				return true;
-			}
-			return false;
-		}), active_bullets.end());
-
-	// Remove dead soldiers
-	soldiers.erase(std::remove_if(soldiers.begin(), soldiers.end(),
-		[](Soldier* s) {
-			if (!s->IsAlive()) {
-				delete s; // Free memory
-				return true;
-			}
-			return false;
-		}), soldiers.end());
-
 	glutPostRedisplay();
 }
-
-//void MouseClick(int button, int state, int x, int y)
-//{
-//	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
-//	{
-//		int target_x = MSZ * x / (double)W;
-//		int target_y = MSZ * (H - y - 1) / (double)H;
-//
-//		if (w01 && w01->IsAlive())
-//		{
-//			// Create a grenade that travels from w01 to the target
-//			Grenade* pg = new Grenade(w01->getX(), w01->getY(), target_x, target_y, w01);
-//
-//			// FOR DEBUG: Make the mouse-clicked one explode instantly
-//			pg->ExplodeNow();
-//
-//			// pg->UpdateSecurityMap(map, securityMap); // UpdateSecurityMap is now called by Update()
-//			active_grenades.push_back(pg);
-//		}
-//
-//		// This test code is fine
-//		if (!soldiers.empty())
-//		{
-//			soldiers[0]->SetTarget(target_x, target_y, map, securityMap);
-//		}
-//	}
-//}
 
 void MouseClick(int button, int state, int x, int y)
 {
